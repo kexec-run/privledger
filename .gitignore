@@ -1,0 +1,25 @@
+# Personal data and media
+vlog/
+
+# logs
+
+logs/
+
+# Video and audio artifacts (extra safety)
+*.mp4
+*.hevc.mp4
+*.srt
+*.wav
+*.mkv
+
+# Temp and atomic files
+*.tmp.*
+*.temp.*
+
+# Python
+__pycache__/
+*.pyc
+
+# OS noise
+.DS_Store
+Thumbs.db
