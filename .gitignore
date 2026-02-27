@@ -1,16 +1,17 @@
 # Personal data and media
-vlog/
+vlog/*
+!vlog/.gitkeep
 
-# logs
+logs/*
+!logs/.gitkeep
 
-logs/
-
-# Video and audio artifacts (extra safety)
+# Video and audio artifacts
 *.mp4
 *.hevc.mp4
 *.srt
 *.wav
 *.mkv
+*.log
 
 # Temp and atomic files
 *.tmp.*
