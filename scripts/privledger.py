@@ -30,18 +30,28 @@ if not SCHEMA_VERSION or not PIPELINE_VERSION:
     print("[privledger] ERROR: missing required env values", file=sys.stderr)
     sys.exit(1)
 
+
 ###############################################################################
-# Device configuration (authoritative here)
+# Environment validation (authoritative from config/env)
 ###############################################################################
 
 ENV = os.environ.copy()
-ENV.update(
-    {
-        "VIDEO_DEV": "/dev/v4l/by-id/usb-046d_Brio_100_2525APJ56A18-video-index0",
-        "AUDIO_SRC": "alsa_input.usb-046d_Brio_100_2525APJ56A18-02.mono-fallback",
-        "VAAPI_DEV": "/dev/dri/renderD128",
-    }
-)
+
+REQUIRED_ENV_VARS = [
+    "VIDEO_DEV",
+    "AUDIO_SRC",
+    "VAAPI_DEV",
+    "SCHEMA_VERSION",
+    "PIPELINE_VERSION",
+]
+
+missing = [k for k in REQUIRED_ENV_VARS if not ENV.get(k)]
+if missing:
+    print(
+        f"[privledger] ERROR: missing required env vars: {', '.join(missing)}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 ###############################################################################
 # Process supervision

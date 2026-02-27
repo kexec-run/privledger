@@ -87,9 +87,9 @@ ffmpeg -hide_banner -loglevel info \
   -init_hw_device vaapi=va:"${VAAPI_DEV}" -filter_hw_device va \
   -fflags +genpts \
   -f v4l2 -input_format mjpeg -framerate 30 -video_size 1920x1080 -i "${VIDEO_DEV}" \
-  -f pulse -ac 1 -i "${AUDIO_SRC}" \
-  -vf "hflip,format=nv12,hwupload" -c:v hevc_vaapi -qp 23 \
-  -c:a pcm_s16le -ar 48000 \
+  -f pulse -i "${AUDIO_SRC}" \
+  -vf "hflip,format=nv12,hwupload" -c:v hevc_vaapi -qp 24 \
+  -c:a flac -compression_level 1 -ar 48000 -ac 1 \
   -f matroska \
   "${TMP_FILE}" >> "${LOG_FILE}" 2>&1 &
 
