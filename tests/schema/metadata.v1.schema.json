@@ -4,25 +4,43 @@
     "id",
     "timestamp_utc",
     "schema_version",
-    "pipeline_version"
+    "pipeline_version",
+    "metadata_quality",
+    "media_file"
   ],
   "additionalProperties": false,
   "properties": {
-    "id": { "type": "string" },
-
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
     "timestamp_utc": {
       "type": "string",
       "format": "date-time"
     },
-
+    "timestamp_local": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
     "schema_version": { "type": "integer" },
-    "pipeline_version": { "type": "string" },
-
+    "pipeline_version": {
+      "type": "string",
+      "minLength": 1
+    },
     "metadata_quality": {
       "type": "string",
-      "enum": ["basic", "full", "corrected"]
+      "enum": ["basic", "full", "corrected", "bad"]
     },
-
+    "media_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "transcript_file": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "minLength": 1 }
+      ]
+    },
     "mood": {
       "type": ["integer", "null"],
       "minimum": 1,
@@ -43,7 +61,6 @@
       "minimum": 1,
       "maximum": 5
     },
-
     "sleep_hours": {
       "type": ["number", "null"],
       "minimum": 0
@@ -56,14 +73,13 @@
       "type": ["number", "null"],
       "minimum": 0
     },
-
     "focus_domain": { "type": ["string", "null"] },
-
     "tags": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": { "type": "string" },
+      "uniqueItems": true,
+      "maxItems": 5
     },
-
     "location": { "type": ["string", "null"] }
   }
 }
