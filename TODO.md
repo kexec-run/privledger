@@ -22,14 +22,20 @@
 [x] Ensure vlog directory auto-creation
 
 ## Metadata Layer
-
-Implement schema validation helper in Python  
-Load versions from config/env  
-Assert env variables exist at startup  
-Generate minimal metadata object  
-Validate metadata against schema  
-Fail write on schema validation error  
-Atomic write for metadata file  
+[x] Implement schema validation helper in Python
+[x] Load versions from config/env
+[x] Assert env variables exist at startup
+[x] Generate minimal metadata object
+[x] Validate metadata against schema
+[x] Fail write on schema validation error
+[x] Atomic write for metadata file
+[x] Enforce tags invariant post-merge
+[x] Enforce optional_fields type check
+[x] parent.mkdir guard in writer
+[x] Use os.replace for atomic rename
+[ ] Wire writer into privledger.py post-capture
+[ ] Implement result file handoff in record.sh
+[ ] Parse result file in privledger.py
 
 ## Enrich Workflow
 
