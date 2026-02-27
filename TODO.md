@@ -6,7 +6,7 @@
 [x] Add `-fflags +genpts` to video input  
 [x] Verify VAAPI device presence at runtime  
 [x] Verify Pulse audio source exists at runtime  
-[ ] Run 15–20 minute capture validation test  
+[x] Run 15–20 minute capture validation test  
 [x] Inspect output with ffprobe for A/V sync and duration  
 [x] Confirm pixel format and codec correctness  
 [x] Wrap ffmpeg in atomic-safe record.sh  
