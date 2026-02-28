@@ -7,8 +7,13 @@ set -x
 ###############################################################################
 
 FF_PID=""
+STOP_SENT=""
 
 on_int() {
+  # Idempotence guard — ensures exactly one graceful stop is issued
+  if [[ -n "${STOP_SENT}" ]]; then return; fi
+  STOP_SENT=1
+
   echo "[record] Graceful stop requested (sending 'q')" | tee -a "${LOG_FILE:-/dev/null}"
   if [[ -n "${FF_PID}" ]] && kill -0 "${FF_PID}" 2>/dev/null; then
     printf 'q\n' > "/proc/${FF_PID}/fd/0" 2>/dev/null || true
@@ -36,7 +41,7 @@ LOG_DIR="${ROOT_DIR}/logs"
 mkdir -p "${VLOG_DIR}"
 mkdir -p "${LOG_DIR}"
 
-TIMESTAMP="$(date -u +"%Y-%m-%d-%H%M")"
+TIMESTAMP="${TIMESTAMP:?TIMESTAMP not set}"
 OUT_FILE="${VLOG_DIR}/${TIMESTAMP}.mkv"
 TMP_FILE="${OUT_FILE}.tmp.$$"
 LOG_FILE="${LOG_DIR}/${TIMESTAMP}-record.log"
