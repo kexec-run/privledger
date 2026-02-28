@@ -103,7 +103,8 @@ def main():
 
     now = datetime.now(timezone.utc)
     timestamp = now.strftime("%Y-%m-%d-%H%M")
-    timestamp_utc_iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp_utc_iso = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    timestamp_local_iso = now.astimezone().replace(microsecond=0).isoformat()
     ENV["TIMESTAMP"] = timestamp
 
     print(f"[privledger] Starting capture at {timestamp}…", flush=True)
@@ -174,7 +175,7 @@ def main():
             metadata_quality=metadata_quality,
             schema_version=int(SCHEMA_VERSION),
             pipeline_version=PIPELINE_VERSION,
-            optional_fields=None,
+            optional_fields={"timestamp_local": timestamp_local_iso},
             schema=SCHEMA,
         )
         print(f"[privledger] Metadata written → {written.name}", flush=True)
