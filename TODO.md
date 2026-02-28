@@ -21,9 +21,11 @@
 [x] Fail loudly on any capture error  
 [x] Ensure vlog directory auto-creation
 
+
 ## Metadata Layer
+
 [x] Implement schema validation helper in Python
-[x] Load versions from config/env
+[x] Load versions from config/env 
 [x] Assert env variables exist at startup
 [x] Generate minimal metadata object
 [x] Validate metadata against schema
@@ -33,9 +35,12 @@
 [x] Enforce optional_fields type check
 [x] parent.mkdir guard in writer
 [x] Use os.replace for atomic rename
-[ ] Wire writer into privledger.py post-capture
+[x] Wire writer into privledger.py post-capture
+[x] 20–30 minute soak test (metadata enabled)
+
 [ ] Implement result file handoff in record.sh
 [ ] Parse result file in privledger.py
+[ ] Add mtime freshness guard
 
 ## Enrich Workflow
 
