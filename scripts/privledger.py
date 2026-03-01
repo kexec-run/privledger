@@ -19,7 +19,6 @@ from metadata.writer import write_metadata_atomic
 # Paths and environment
 ###############################################################################
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
 CONFIG_ENV = ROOT_DIR / "config" / "env"
 RECORD_SCRIPT = ROOT_DIR / "scripts" / "record.sh"
 SCHEMA_PATH = ROOT_DIR / "tests" / "schema" / "metadata.v1.schema.json"
@@ -75,6 +74,15 @@ SCHEMA = json.loads(SCHEMA_PATH.read_text())
 ###############################################################################
 
 proc: subprocess.Popen | None = None
+
+
+def detect_video_device_name(video_dev: str) -> str:
+    try:
+        node = os.path.basename(os.path.realpath(video_dev))
+        name = Path(f"/sys/class/video4linux/{node}/name").read_text().strip().lower()
+        return name if name else "unknown"
+    except Exception:
+        return "unknown"
 
 
 def handle_signal(signum, frame):
@@ -175,7 +183,10 @@ def main():
             metadata_quality=metadata_quality,
             schema_version=int(SCHEMA_VERSION),
             pipeline_version=PIPELINE_VERSION,
-            optional_fields={"timestamp_local": timestamp_local_iso},
+            optional_fields={
+                "timestamp_local": timestamp_local_iso,
+                "video_device": detect_video_device_name(ENV.get("VIDEO_DEV", "")),
+            },
             schema=SCHEMA,
         )
         print(f"[privledger] Metadata written → {written.name}", flush=True)
