@@ -53,11 +53,21 @@
 
 [x] Implement basic enrich CLI
 [ ] Load controlled vocabulary from config/tags.txt
-[ ] Single-select focus_domain
-[ ] Multi-select tags (exclude focus)
-[ ] Enforce focus not present in tags
-[ ] Normalize inputs before validation
-[ ] Update metadata_quality on success
+[ ] Show tag list on "?" input during tag prompt
+[ ] Enforce vocabulary membership for tags (reject unknown)
+[ ] Normalize tag inputs (lowercase, strip whitespace)
+[ ] Deduplicate tags after merge
+[ ] Enforce maxItems (≤5) after merge
+[ ] Append semantics for tags by default
+[ ] Single-select focus_domain from vocabulary
+[ ] Normalize focus_domain to lowercase
+[ ] Remove focus_domain from tags during write (silent normalization)
+[ ] Normalize numeric inputs before validation
+[ ] Update metadata_quality on successful enrich
+
+## Metadata Hardening
+
+[ ] Add tags_version field (deferred vocabulary evolution support)
 
 ## Terminal Compatibility
 
