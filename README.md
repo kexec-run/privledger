@@ -1,3 +1,4 @@
+
 # privledger
 
 Video ledger that captures daily entries to reveal patterns and personal growth over time.
@@ -134,6 +135,14 @@ pactl list short sources
 ```
 
 Pick the correct input (mic or webcam).
+
+### VAAPI device discovery
+
+```bash
+ls /dev/dri/render*
+```
+
+Pick the `renderD*` entry and set it as `VAAPI_DEV`.
 
 ### Example config/env
 
