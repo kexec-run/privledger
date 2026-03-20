@@ -25,7 +25,7 @@ SCHEMA_PATH = ROOT_DIR / "tests" / "schema" / "metadata.v1.schema.json"
 
 # Load config/env
 if not CONFIG_ENV.exists():
-    print("[privledger] ERROR: config/env missing", file=sys.stderr)
+    print("[privledger] ERROR: config/env missing (copy from config/env.sample)", file=sys.stderr)
     sys.exit(1)
 
 load_dotenv(CONFIG_ENV)

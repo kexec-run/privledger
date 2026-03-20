@@ -5,6 +5,8 @@ vlog/*
 logs/*
 !logs/.gitkeep
 
+config/env
+
 # Video and audio artifacts
 *.mkv
 *.mp4
