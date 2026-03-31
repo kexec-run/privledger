@@ -1,0 +1,4 @@
+vitamin_d: number
+creatine: number
+took_preworkout: boolean
+notes: string

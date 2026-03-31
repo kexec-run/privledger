@@ -13,7 +13,8 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from metadata.writer import write_metadata_atomic
+from metadata.check import check_invariants  # noqa: E402
+from metadata.writer import write_metadata_atomic  # noqa: E402
 
 ###############################################################################
 # Paths and environment
@@ -25,7 +26,10 @@ SCHEMA_PATH = ROOT_DIR / "tests" / "schema" / "metadata.v1.schema.json"
 
 # Load config/env
 if not CONFIG_ENV.exists():
-    print("[privledger] ERROR: config/env missing (copy from config/env.sample)", file=sys.stderr)
+    print(
+        "[privledger] ERROR: config/env missing (copy from config/env.sample)",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 load_dotenv(CONFIG_ENV)
@@ -68,6 +72,24 @@ if not SCHEMA_PATH.exists():
     sys.exit(1)
 
 SCHEMA = json.loads(SCHEMA_PATH.read_text())
+
+###############################################################################
+# Custom schema (optional)
+###############################################################################
+
+CUSTOM_SCHEMA_PATH = ROOT_DIR / "config" / "custom_schema.yaml"
+CUSTOM_ENABLED = os.getenv("CUSTOM_ENABLED", "false").lower() == "true"
+
+custom_fields = None
+
+if CUSTOM_ENABLED:
+    try:
+        from metadata.custom_schema import load_custom_schema
+
+        custom_fields, _, _ = load_custom_schema(CUSTOM_SCHEMA_PATH)
+    except FileNotFoundError:
+        custom_fields = None
+        CUSTOM_ENABLED = False
 
 ###############################################################################
 # Process supervision
@@ -139,10 +161,10 @@ def main():
     ###########################################################################
 
     good_path = ROOT_DIR / "vlog" / f"{timestamp}.mkv"
-    bad_path  = ROOT_DIR / "vlog" / f"{timestamp}.mkv.bad.mkv"
+    bad_path = ROOT_DIR / "vlog" / f"{timestamp}.mkv.bad.mkv"
 
     good_exists = good_path.exists()
-    bad_exists  = bad_path.exists()
+    bad_exists = bad_path.exists()
 
     # Invariant violation — both states cannot coexist
     if good_exists and bad_exists:
@@ -162,10 +184,10 @@ def main():
 
     # Resolve media file and quality
     if good_exists:
-        media_file       = good_path.name
+        media_file = good_path.name
         metadata_quality = "basic"
     else:
-        media_file       = bad_path.name
+        media_file = bad_path.name
         metadata_quality = "bad"
 
     ###########################################################################
@@ -174,7 +196,22 @@ def main():
 
     metadata_path = ROOT_DIR / "vlog" / f"{timestamp}.json"
 
+    optional_fields = {
+        "timestamp_local": timestamp_local_iso,
+        "video_device": detect_video_device_name(ENV.get("VIDEO_DEV", "")),
+    }
+
+    if CUSTOM_ENABLED:
+        optional_fields["custom"] = None
+
     try:
+        # Validate custom schema invariants before write
+        if CUSTOM_ENABLED:
+            check_invariants(
+                {"custom": optional_fields.get("custom")},
+                custom_fields,
+            )
+
         written = write_metadata_atomic(
             output_path=metadata_path,
             entry_id=timestamp,
@@ -183,10 +220,7 @@ def main():
             metadata_quality=metadata_quality,
             schema_version=int(SCHEMA_VERSION),
             pipeline_version=PIPELINE_VERSION,
-            optional_fields={
-                "timestamp_local": timestamp_local_iso,
-                "video_device": detect_video_device_name(ENV.get("VIDEO_DEV", "")),
-            },
+            optional_fields=optional_fields,
             schema=SCHEMA,
         )
         print(f"[privledger] Metadata written → {written.name}", flush=True)

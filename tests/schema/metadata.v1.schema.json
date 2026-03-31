@@ -84,6 +84,23 @@
       "uniqueItems": true,
       "maxItems": 5
     },
-    "location": { "type": ["string", "null"] }
+    "location": { "type": ["string", "null"] },
+    "custom": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_hash": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 12,
+          "pattern": "^[0-9a-f]{12}$"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": ["schema_hash", "data"]
+    }
   }
 }

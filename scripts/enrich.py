@@ -10,7 +10,8 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from metadata.writer import write_metadata_atomic
+from metadata.check import check_invariants  # noqa: E402
+from metadata.writer import write_metadata_atomic  # noqa: E402
 
 ###############################################################################
 # Paths and environment
@@ -21,7 +22,10 @@ SCHEMA_PATH = ROOT_DIR / "tests" / "schema" / "metadata.v1.schema.json"
 VLOG_DIR = ROOT_DIR / "vlog"
 
 if not CONFIG_ENV.exists():
-    print("[enrich] ERROR: config/env missing (copy from config/env.sample)", file=sys.stderr)
+    print(
+        "[enrich] ERROR: config/env missing (copy from config/env.sample)",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 load_dotenv(CONFIG_ENV)
@@ -39,9 +43,19 @@ if not SCHEMA_PATH.exists():
 
 SCHEMA = json.loads(SCHEMA_PATH.read_text())
 
+_MISSING = object()
+
+###############################################################################
+# Custom schema (optional)
+###############################################################################
+
+CUSTOM_SCHEMA_PATH = ROOT_DIR / "config" / "custom_schema.yaml"
+CUSTOM_ENABLED = os.getenv("CUSTOM_ENABLED", "false").lower() == "true"
+
 ###############################################################################
 # Resolution helpers
 ###############################################################################
+
 
 def resolve_timestamp(input_path: str) -> str:
     """Extract timestamp from any accepted input form."""
@@ -66,6 +80,7 @@ def load_metadata(path: Path) -> dict:
 # Input normalization
 ###############################################################################
 
+
 def _readline(prompt: str) -> str:
     """Read a line using sys.stdin.readline to bypass TTY CR artifacts."""
     sys.stdout.write(prompt)
@@ -80,6 +95,7 @@ def _readline(prompt: str) -> str:
 ###############################################################################
 # Prompt helpers
 ###############################################################################
+
 
 def prompt_int(label: str, current, min_val: int, max_val: int):
     """Prompt for an integer in [min_val, max_val]. Enter = keep current."""
@@ -125,7 +141,7 @@ def prompt_str(label: str, current):
 def prompt_tags(existing: list) -> list:
     """Prompt for tags to append. Enter = no change."""
     display = ",".join(existing) if existing else ""
-    print(f"Tags (append, comma separated)")
+    print("Tags (append, comma separated)")
     print(f"Current: {display}")
     raw = _readline("Add tags: ")
     if not raw:
@@ -142,8 +158,90 @@ def prompt_tags(existing: list) -> list:
 
 
 ###############################################################################
+# Custom schema functions
+###############################################################################
+
+
+def prompt_bool(label: str, current):
+    """Prompt for a boolean (y/n). Enter = keep current."""
+    display = "y" if current is True else "n" if current is False else ""
+    while True:
+        raw = _readline(f"{label} (y/n) [current: {display}] ").lower()
+        if not raw:
+            return current
+        if raw in ("y", "yes"):
+            return True
+        if raw in ("n", "no"):
+            return False
+        print("  Invalid. Enter y/n or blank.")
+
+
+def prompt_for_type(label, typ, current):
+    """Type-driven prompt dispatcher."""
+    if typ is int:
+        return prompt_int(label, current, 0, 10**9)
+    elif typ == (int, float):
+        return prompt_float(label, current)
+    elif typ is bool:
+        return prompt_bool(label, current)
+    elif typ is str:
+        return prompt_str(label, current)
+    else:
+        raise ValueError(f"unsupported type for {label}")
+
+
+def prompt_schema_change(old, new):
+    """Prompt user when schema hash changed."""
+    print(f"Schema changed ({old} → {new})")
+    raw = _readline("1. Keep existing  2. Overwrite: ")
+    return "keep" if raw == "1" else "overwrite"
+
+
+def build_custom(fields, types, schema_hash):
+    """Build fresh custom envelope with prompted values."""
+    data = {}
+    for f in fields:
+        data[f] = prompt_for_type(f, types[f], None)
+    return {"schema_hash": schema_hash, "data": data}
+
+
+def update_existing(custom, fields, types):
+    """Update existing custom envelope, preserving current values."""
+    data = {}
+    for f in fields:
+        current = custom["data"].get(f)
+        data[f] = prompt_for_type(f, types[f], current)
+    return {"schema_hash": custom["schema_hash"], "data": data}
+
+
+def resolve_custom(original, fields, types, current_hash):
+    """Resolve next custom state from (original, YAML)."""
+    custom = original.get("custom", _MISSING)
+
+    if fields is None:
+        return _MISSING  # feature disabled
+
+    if custom is _MISSING:
+        return None  # not enriched yet
+
+    if custom is None:
+        return build_custom(fields, types, current_hash)  # first enrichment
+
+    old_hash = custom["schema_hash"]
+
+    if old_hash == current_hash:
+        return update_existing(custom, fields, types)  # same schema
+
+    decision = prompt_schema_change(old_hash, current_hash)
+    if decision == "keep":
+        return custom
+    return build_custom(fields, types, current_hash)
+
+
+###############################################################################
 # Main
 ###############################################################################
+
 
 def main():
     if len(sys.argv) < 2:
@@ -160,29 +258,60 @@ def main():
     original = load_metadata(meta_path)
 
     print(f"\n{'─' * 40}")
-    print(f"  Enrich Metadata")
+    print("  Enrich Metadata")
     print(f"  Session: {ts}")
     print(f"{'─' * 40}\n")
 
     # Immutable fields — passed through unchanged
     IMMUTABLE = {
-        "id", "timestamp_utc", "timestamp_local", "schema_version",
-        "pipeline_version", "media_file", "video_device", "metadata_quality",
+        "id",
+        "timestamp_utc",
+        "timestamp_local",
+        "schema_version",
+        "pipeline_version",
+        "media_file",
+        "video_device",
+        "metadata_quality",
         "transcript_file",
+        "custom",
     }
+
+    # Load custom schema if enabled
+    fields = types = current_hash = None
+    new_custom = _MISSING
+    if CUSTOM_ENABLED:
+        try:
+            from metadata.custom_schema import load_custom_schema
+
+            fields, types, current_hash = load_custom_schema(CUSTOM_SCHEMA_PATH)
+        except FileNotFoundError:
+            pass  # YAML missing — skip custom processing
 
     try:
         updates = {}
-        updates["mood"]         = prompt_int("Mood",       original.get("mood"),       1, 5)
-        updates["energy"]       = prompt_int("Energy",     original.get("energy"),     1, 5)
-        updates["stress"]       = prompt_int("Stress",     original.get("stress"),     1, 5)
-        updates["sleepiness"]   = prompt_int("Sleepiness", original.get("sleepiness"), 1, 5)
-        updates["sleep_hours"]  = prompt_float("Sleep hours",  original.get("sleep_hours"))
-        updates["caffeine_mg"]  = prompt_float("Caffeine mg",  original.get("caffeine_mg"))
-        updates["body_weight"]  = prompt_float("Body weight",  original.get("body_weight"))
-        updates["focus_domain"] = prompt_str("Focus domain",   original.get("focus_domain"))
-        updates["tags"]         = prompt_tags(original.get("tags") or [])
-        updates["location"]     = prompt_str("Location",        original.get("location"))
+        updates["mood"] = prompt_int("Mood", original.get("mood"), 1, 5)
+        updates["energy"] = prompt_int("Energy", original.get("energy"), 1, 5)
+        updates["stress"] = prompt_int("Stress", original.get("stress"), 1, 5)
+        updates["sleepiness"] = prompt_int(
+            "Sleepiness", original.get("sleepiness"), 1, 5
+        )
+        updates["sleep_hours"] = prompt_float(
+            "Sleep hours", original.get("sleep_hours")
+        )
+        updates["caffeine_mg"] = prompt_float(
+            "Caffeine mg", original.get("caffeine_mg")
+        )
+        updates["body_weight"] = prompt_float(
+            "Body weight", original.get("body_weight")
+        )
+        updates["focus_domain"] = prompt_str(
+            "Focus domain", original.get("focus_domain")
+        )
+        updates["tags"] = prompt_tags(original.get("tags") or [])
+        updates["location"] = prompt_str("Location", original.get("location"))
+
+        # Custom schema transform
+        new_custom = resolve_custom(original, fields, types, current_hash)
     except KeyboardInterrupt:
         print("\n\n[enrich] Aborted. No changes written.")
         sys.exit(0)
@@ -195,6 +324,17 @@ def main():
 
     # Merge: immutable fields from original, user fields from updates
     merged = {**original, **updates}
+    if new_custom is _MISSING:
+        merged.pop("custom", None)
+    else:
+        merged["custom"] = new_custom
+
+    # Validate invariants before write
+    try:
+        check_invariants(merged, fields, types, current_hash)
+    except ValueError as e:
+        print(f"[enrich] ERROR: validation failed: {e}", file=sys.stderr)
+        sys.exit(1)
 
     try:
         write_metadata_atomic(
@@ -205,10 +345,19 @@ def main():
             metadata_quality=merged["metadata_quality"],
             schema_version=int(SCHEMA_VERSION),
             pipeline_version=PIPELINE_VERSION,
-            optional_fields={k: v for k, v in merged.items() if k not in {
-                "id", "timestamp_utc", "schema_version", "pipeline_version",
-                "metadata_quality", "media_file",
-            }},
+            optional_fields={
+                k: v
+                for k, v in merged.items()
+                if k
+                not in {
+                    "id",
+                    "timestamp_utc",
+                    "schema_version",
+                    "pipeline_version",
+                    "metadata_quality",
+                    "media_file",
+                }
+            },
             schema=SCHEMA,
         )
         print(f"[enrich] Metadata updated → {meta_path.name}")
