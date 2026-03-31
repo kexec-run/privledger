@@ -18,6 +18,7 @@ Capture pipeline stable. Metadata layer wired and schema-validated. Enrich CLI f
 
 - [Architecture](docs/arch.md) — data flow, stage contracts, directory structure
 - [Tags](docs/tags.md) — tag semantics, definitions, and usage rules
+- [Recording Guide](docs/questions.md) — what to say when you don't know what to say while recording
 
 ## Tasks
 
