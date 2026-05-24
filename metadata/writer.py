@@ -3,6 +3,7 @@ import os
 import tempfile
 from pathlib import Path
 
+from metadata.check import check_core_invariants
 from metadata.validator import validate_metadata
 
 
@@ -52,11 +53,8 @@ def write_metadata_atomic(
             raise TypeError("optional_fields must be a dict or None")
         metadata.update(optional_fields)
 
-    # Enforce tags invariant — must always be a list
-    if metadata.get("tags") is None:
-        metadata["tags"] = []
-    if not isinstance(metadata["tags"], list):
-        raise TypeError("tags must be a list")
+    # Enforce core invariants before schema validation.
+    check_core_invariants(metadata)
 
     # 2. Validate against schema — fail fast, nothing written if invalid
     validate_metadata(metadata, schema)

@@ -1,6 +1,17 @@
 import re
+from metadata.tags import validate_tag_bundle
 
 _MISSING = object()
+
+
+
+def check_core_invariants(data):
+    """Enforce metadata invariants that live above JSON schema shape."""
+    tags = data.get("tags", [])
+    focus_domain = data.get("focus_domain")
+    regular_tags = validate_tag_bundle(tags, focus_domain)
+    if tags is None:
+        data["tags"] = regular_tags
 
 
 def check_invariants(data, custom_fields, custom_types=None, current_hash=None):

@@ -319,19 +319,43 @@ Example:
 
 ### Focus Domain Rules
 
+* `focus_domain` is a special kind of tag: the single primary tag for the entry
 * Only **one** focus domain allowed
-* Must be selected from tags
+* Must be selected from the configured tag vocabulary (`config/tags.txt`)
+* Must not also appear in the entry's regular `tags` list
 * Represents the **dominant undertone**
+
+Stored-data validation for tags and focus domain is documented in [metadata.md](./metadata.md).
+Prompt behavior and typo resolution are documented in [enrichment.md](./enrichment.md).
+
+This file owns tag meaning and selection semantics.
 
 #### Selection Rule
 
-If you have multiple tags and are unsure:
+If you have multiple possible focus domains and are unsure:
 
 > Pick the one that defined the session or influenced everything else.
 
+#### Representation Rule
+
+`focus_domain` is stored separately from regular `tags` because it is the primary tag, not another regular tag-list item.
+
+Example:
+
+```json
+{
+  "focus_domain": "sleep",
+  "tags": ["chores", "exercise", "job", "love"]
+}
+```
+
+This is valid if `sleep` exists in `config/tags.txt`.
+
+Do not duplicate the focus domain in `tags`. A primary tag is represented by `focus_domain`; regular descriptive tags stay in `tags`.
+
 #### Focus Domain Can Be Empty
 
-```
+```text
 focus_domain = null
 ```
 

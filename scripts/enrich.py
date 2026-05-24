@@ -2,6 +2,7 @@
 
 import json
 import os
+import importlib
 import sys
 from pathlib import Path
 
@@ -11,6 +12,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
 from metadata.check import check_invariants  # noqa: E402
+from metadata.tags import load_tag_vocabulary, validate_focus_domain  # noqa: E402
 from metadata.writer import write_metadata_atomic  # noqa: E402
 
 ###############################################################################
@@ -138,23 +140,159 @@ def prompt_str(label: str, current):
     return raw
 
 
-def prompt_tags(existing: list) -> list:
-    """Prompt for tags to append. Enter = no change."""
-    display = ",".join(existing) if existing else ""
-    print("Tags (append, comma separated)")
-    print(f"Current: {display}")
-    raw = _readline("Add tags: ")
-    if not raw:
-        return existing
 
-    new_tags = [t.strip().lower() for t in raw.split(",") if t.strip()]
-    merged = existing + [t for t in new_tags if t not in existing]
+def print_tag_grid(tags: list[str], *, columns: int = 4) -> None:
+    """Print tags horizontally for quick scanning."""
+    if not tags:
+        return
+
+    width = max(len(tag) for tag in tags) + 4
+    for i in range(0, len(tags), columns):
+        row = tags[i : i + columns]
+        print("".join(f"{tag:<{width}}" for tag in row).rstrip())
+
+
+def tag_match_score(query: str, candidate: str) -> int:
+    """Score a raw tag query against a canonical tag."""
+    normalized = query.strip().lower()
+    if normalized == candidate:
+        return 100
+
+    try:
+        fuzz = importlib.import_module("rapidfuzz.fuzz")
+        return int(fuzz.WRatio(normalized, candidate))
+    except ImportError:
+        from difflib import SequenceMatcher
+
+        return int(SequenceMatcher(None, normalized, candidate).ratio() * 100)
+
+
+def tag_candidates(raw: str, vocabulary: list[str], *, min_score: int = 75) -> list[str]:
+    """Return canonical tag candidates ordered by typo-match score."""
+    query = raw.strip().lower()
+    scored = [
+        (tag_match_score(query, tag), tag)
+        for tag in vocabulary
+        if tag_match_score(query, tag) >= min_score
+    ]
+    return [tag for _score, tag in sorted(scored, key=lambda item: (-item[0], item[1]))]
+
+
+def choose_candidate(raw: str, candidates: list[str]) -> str:
+    """Choose one canonical tag from multiple plausible candidates."""
+    print(f"Did you mean '{raw}'?")
+    for i, tag in enumerate(candidates, start=1):
+        print(f"{i}. {tag}  score {tag_match_score(raw, tag)}")
+
+    while True:
+        choice = _readline("Select: ")
+        try:
+            index = int(choice)
+        except ValueError:
+            print("  Invalid. Enter a number.")
+            continue
+        if 1 <= index <= len(candidates):
+            selected = candidates[index - 1]
+            if selected != raw:
+                print(f'Resolved "{raw}" -> {selected}')
+            return selected
+        print(f"  Invalid. Enter 1-{len(candidates)}.")
+
+
+def resolve_tag_input(raw: str, vocabulary: list[str]) -> str:
+    """Resolve raw user input to exactly one canonical tag."""
+    normalized = raw.strip().lower()
+    if not normalized:
+        raise ValueError("empty tag")
+
+    if not vocabulary:
+        return normalized
+    if normalized in vocabulary:
+        return normalized
+
+    candidates = tag_candidates(normalized, vocabulary)
+    if not candidates:
+        raise ValueError(f"unknown tag: {normalized}")
+    if len(candidates) == 1:
+        selected = candidates[0]
+        print(f'Resolved "{normalized}" -> {selected}')
+        return selected
+    return choose_candidate(normalized, candidates)
+
+
+def merge_tags(
+    existing: list[str],
+    selected: list[str],
+    vocabulary: list[str],
+    focus_domain: str | None = None,
+) -> list[str]:
+    vocabulary_set = set(vocabulary)
+    merged = list(existing)
+
+    for tag in selected:
+        normalized = resolve_tag_input(tag, vocabulary)
+        if not normalized:
+            continue
+        if vocabulary_set and normalized not in vocabulary_set:
+            raise ValueError(f"unknown tag: {normalized}")
+        if normalized not in merged:
+            merged.append(normalized)
+
+    validate_focus_domain(focus_domain, merged, vocabulary_set)
 
     if len(merged) > 5:
-        print(f"  Tag limit is 5. Keeping first 5: {merged[:5]}")
-        merged = merged[:5]
+        raise ValueError("tag limit is 5")
 
     return sorted(merged)
+
+
+def prompt_tags(
+    existing: list[str],
+    vocabulary: list[str] | None = None,
+    focus_domain: str | None = None,
+) -> list[str]:
+    """Prompt for tags to append. Enter = no change."""
+    vocabulary = vocabulary if vocabulary is not None else load_tag_vocabulary()
+
+    while True:
+        display = ", ".join(existing) if existing else "none"
+        print()
+        print(f"Selected tags: {display}")
+
+        raw = _readline("Additional tags (comma separated, optional): ")
+        if not raw:
+            return existing
+
+        selected = [t.strip() for t in raw.split(",") if t.strip()]
+        try:
+            return merge_tags(existing, selected, vocabulary, focus_domain)
+        except ValueError as e:
+            print(f"  Invalid tags: {e}")
+
+
+def prompt_focus_domain(
+    current: str | None,
+    vocabulary: list[str],
+    regular_tags: list[str],
+) -> str | None:
+    """Select one primary tag as focus domain. Enter = keep current when valid."""
+    if current is not None and vocabulary and current not in vocabulary:
+        current = None
+    vocabulary_set = set(vocabulary)
+
+    while True:
+        display = current if current is not None else ""
+        raw = _readline(
+            f"Focus domain (select only one primary tag) [current: {display}]: "
+        )
+        if not raw and current is None:
+            return None
+        try:
+            selected = current if not raw else resolve_tag_input(raw, vocabulary)
+            validate_focus_domain(selected, regular_tags, vocabulary_set)
+            return selected
+        except ValueError as e:
+            print(f"  Invalid focus domain: {e}")
 
 
 ###############################################################################
@@ -289,12 +427,16 @@ def main():
 
     try:
         updates = {}
+        print("Ratings")
         updates["mood"] = prompt_int("Mood", original.get("mood"), 1, 5)
         updates["energy"] = prompt_int("Energy", original.get("energy"), 1, 5)
         updates["stress"] = prompt_int("Stress", original.get("stress"), 1, 5)
         updates["sleepiness"] = prompt_int(
             "Sleepiness", original.get("sleepiness"), 1, 5
         )
+
+        print()
+        print("Body")
         updates["sleep_hours"] = prompt_float(
             "Sleep hours", original.get("sleep_hours")
         )
@@ -304,10 +446,23 @@ def main():
         updates["body_weight"] = prompt_float(
             "Body weight", original.get("body_weight")
         )
-        updates["focus_domain"] = prompt_str(
-            "Focus domain", original.get("focus_domain")
+        print()
+        print("Tags")
+        print("Available:")
+        tag_vocabulary = load_tag_vocabulary()
+        print_tag_grid(tag_vocabulary)
+        print()
+        existing_tags = original.get("tags") or []
+        updates["focus_domain"] = prompt_focus_domain(
+            original.get("focus_domain"), tag_vocabulary, existing_tags
         )
-        updates["tags"] = prompt_tags(original.get("tags") or [])
+        updates["tags"] = prompt_tags(
+            existing_tags,
+            tag_vocabulary,
+            updates["focus_domain"],
+        )
+
+        print()
         updates["location"] = prompt_str("Location", original.get("location"))
 
         # Custom schema transform
@@ -315,6 +470,9 @@ def main():
     except KeyboardInterrupt:
         print("\n\n[enrich] Aborted. No changes written.")
         sys.exit(0)
+    except ValueError as e:
+        print(f"[enrich] ERROR: validation failed: {e}", file=sys.stderr)
+        sys.exit(1)
 
     print()
 
