@@ -22,14 +22,18 @@ Each layer owns one class of responsibility. Cross-layer leakage should be treat
 
 | Layer | Owns | Must Not Own |
 |---|---|---|
+| `config/` | local runtime inputs and controlled vocabulary files | capture classification or validation logic |
 | `scripts/record.sh` | media capture, temporary file lifecycle, final media artifact | metadata classification |
 | `scripts/privledger.py` | orchestration, timestamp generation, artifact classification | user enrichment prompts |
 | filesystem | capture outcome evidence | schema interpretation |
 | `metadata/writer.py` | metadata construction, invariant check, schema validation, atomic write | user interaction |
 | `metadata/check.py` | strict stored-data invariants | fuzzy typo correction |
 | `metadata/tags.py` | exact tag vocabulary loading and tag/focus predicates | prompt UI |
+| `metadata/custom_schema.py` | custom metadata schema loading and type normalization | prompt rendering or persistence |
+| `metadata/validator.py` | JSON schema validation wrapper | semantic invariant definitions |
 | `scripts/enrich.py` | user input, typo resolution, re-prompt behavior | durable invariant definitions |
-| `tests/` | behavior verification | changing production behavior |
+| `tests/schema/` | JSON schema contract fixtures | runtime schema mutation |
+| `tests/` | behavior verification and mock capture cases | changing production behavior |
 
 ## Data Flow
 
@@ -122,7 +126,9 @@ Generated artifacts and local data volume details are omitted.
 ```text
 .
 ├── config/ - runtime configuration and controlled vocabularies
+│   ├── custom_schema.yaml
 │   ├── env
+│   ├── env.sample
 │   └── tags.txt
 ├── docs/ - contracts and operating notes
 │   ├── arch.md
@@ -133,10 +139,34 @@ Generated artifacts and local data volume details are omitted.
 │   ├── tags.md
 │   └── test.md
 ├── logs/ - disposable capture logs
+│   └── .gitkeep
 ├── metadata/ - validation and persistence layer
+│   ├── __init__.py
+│   ├── check.py
+│   ├── custom_schema.py
+│   ├── tags.py
+│   ├── validator.py
+│   └── writer.py
 ├── scripts/ - command entrypoints and orchestration
+│   ├── enrich.py
+│   ├── privledger.py
+│   ├── record.sh
+│   └── test_writer.py
 ├── tests/ - behavior and schema verification
-└── vlog/ - durable media and metadata store
+│   ├── schema/
+│   │   └── metadata.v1.schema.json
+│   ├── test_check.py
+│   ├── test_enrich_behavior.py
+│   ├── test_supervisor_behavior.py
+│   └── test_writer_invariants.py
+├── vlog/ - durable media and metadata store
+│   ├── .gitkeep
+│   └── TS.json / TS.mkv / TS.mkv.bad.mkv
+├── .pre-commit-config.yaml
+├── AGENTS.md
+├── README.md
+├── requirements.txt
+└── TODO.md
 ```
 
 ## Known Tradeoffs

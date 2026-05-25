@@ -2,6 +2,8 @@
 
 Video ledger that captures daily entries to reveal patterns and personal growth over time.
 
+README is the entrypoint. Detailed contracts live under `docs/`.
+
 ## Principles
 
 - Append-only history
@@ -12,19 +14,57 @@ Video ledger that captures daily entries to reveal patterns and personal growth 
 
 ## Status
 
-Capture pipeline stable. Metadata layer wired and schema-validated. Enrich CLI functional. Active development on hardening and enrichment workflow.
+Capture pipeline exists. Metadata writes are schema-validated and atomic. Enrichment CLI is functional. Tag/focus invariants are encoded in tests. Active development is focused on hardening capture classification and enrichment workflow.
+
+Known current deviation: the supervisor behavior matrix has one failing case where a `.bad.mkv` artifact with recorder exit `0` still returns success.
+
+## Quick Start
+
+Install Python dependencies:
+
+```bash
+pip install --user -r requirements.txt
+```
+
+Copy runtime config:
+
+```bash
+cp config/env.sample config/env
+```
+
+Edit `config/env` with device and version values.
+
+Run capture:
+
+```bash
+python3 scripts/privledger.py
+```
+
+Enrich metadata:
+
+```bash
+python3 scripts/enrich.py vlog/TS.json
+```
+
+Run focused behavior tests:
+
+```bash
+PYTHONPATH=. pytest tests/test_writer_invariants.py tests/test_enrich_behavior.py -q
+```
 
 ## Docs
 
-- [Architecture](docs/arch.md) — data flow, stage contracts, directory structure
-- [Tags](docs/tags.md) — tag semantics, definitions, and usage rules
-- [Recording Guide](docs/questions.md) — what to say when you don't know what to say while recording
+- [Architecture](docs/arch.md) - data flow, layer boundaries, invariants, failure matrix
+- [Operations](docs/operations.md) - setup, commands, recording, enrichment, verification
+- [Metadata](docs/metadata.md) - schema fields, writers, validation, stored-data invariants
+- [Enrichment](docs/enrichment.md) - prompt flow, typo resolution, focus-domain behavior
+- [Tags](docs/tags.md) - tag semantics, definitions, and usage rules
+- [Test Matrix](docs/test.md) - behavior matrix and failure cases
+- [Recording Guide](docs/questions.md) - what to say when you don't know what to say while recording
 
 ## Tasks
 
 See [TODO.md](TODO.md) for current status and planned work.
-
----
 
 ## Requirements
 
@@ -49,8 +89,6 @@ Install locally (user scope recommended):
 
 ```bash
 pip install --user -r requirements.txt
-# or manually
-pip install --user python-dotenv jsonschema
 ```
 
 If your system restricts user installs, add `--break-system-packages`.
@@ -63,30 +101,17 @@ export PATH="$HOME/.local/bin:$PATH"
 
 Add to your shell config (`.bashrc`, `.zshrc`) for persistence.
 
-Verify:
-
-```bash
-which python3
-python3 -c "import dotenv, jsonschema"
-```
-
 ### Optional
 
-- `mpv` — video playback verification
-- `jq` — JSON inspection
-- `v4l-utils` — device inspection via `v4l2-ctl`
+- `mpv` - video playback verification
+- `jq` - JSON inspection
+- `v4l-utils` - device inspection via `v4l2-ctl`
 
 These are not required for pipeline execution.
-
----
 
 ## Configuration
 
 All runtime configuration is defined in `config/env`.
-
-### Setup
-
-Copy the sample config:
 
 ```bash
 cp config/env.sample config/env
@@ -94,58 +119,15 @@ cp config/env.sample config/env
 
 Then edit `config/env` with your device values.
 
-### Required variables
+Required variables:
 
-- `VIDEO_DEV` — video device path
-- `AUDIO_SRC` — PulseAudio source name
-- `VAAPI_DEV` — VAAPI device (e.g. `/dev/dri/renderD128`)
+- `VIDEO_DEV` - video device path
+- `AUDIO_SRC` - PulseAudio source name
+- `VAAPI_DEV` - VAAPI device, for example `/dev/dri/renderD128`
 - `SCHEMA_VERSION`
 - `PIPELINE_VERSION`
 
-### Video device discovery
-
-Prefer `/dev/videoX` for initial setup.
-Use `/dev/v4l/by-id/` only if you need stable device mapping.
-
-**Step 1: find available devices**
-
-```bash
-ls /dev/video*
-```
-
-**Step 2: test the device**
-
-```bash
-ffmpeg -f v4l2 -input_format mjpeg -i /dev/video0 -frames:v 1 test.jpg
-```
-
-If this fails, try a different `/dev/videoX`.
-
-**Optional: get stable path**
-
-```bash
-ls /dev/v4l/by-id/
-```
-
-### Audio source discovery
-
-```bash
-pactl list short sources
-```
-
-Pick the correct input (mic or webcam).
-
-### Example config/env
-
-```
-VIDEO_DEV=/dev/video0
-AUDIO_SRC=alsa_input.usb-XXXX.mono-fallback
-VAAPI_DEV=/dev/dri/renderD128
-SCHEMA_VERSION=1
-PIPELINE_VERSION=0.1.0
-```
-
----
+Device discovery and troubleshooting details live in [docs/operations.md](docs/operations.md).
 
 ## Usage
 
@@ -159,47 +141,71 @@ Run from repository root:
 python3 scripts/privledger.py
 ```
 
-Press `Ctrl+C` to stop recording (graceful shutdown).
+Press `Ctrl+C` to stop recording with graceful shutdown.
 
 Output is written to `vlog/`:
 
-```
+```text
 vlog/
   TS.mkv
-  TS.mkv.bad.mkv   (degraded capture)
-  TS.json          (metadata)
+  TS.mkv.bad.mkv   degraded capture
+  TS.json          metadata
 ```
 
 ### Enrich metadata
 
 ```bash
-python3 scripts/enrich.py vlog/TS.mkv
-```
-
-or
-
-```bash
 python3 scripts/enrich.py vlog/TS.json
 ```
 
-### Inspect metadata (optional)
+The argument may also be a timestamp, media filename, or path that resolves to a timestamp.
+
+### Inspect metadata
 
 ```bash
 cat vlog/TS.json | jq .
 ```
 
-### Playback (optional)
+### Playback
 
 ```bash
 mpv vlog/TS.mkv
 ```
 
----
+## Verification
+
+Run focused invariant and enrichment tests:
+
+```bash
+PYTHONPATH=. pytest tests/test_writer_invariants.py tests/test_enrich_behavior.py -q
+```
+
+Run supervisor and custom-check behavior tests:
+
+```bash
+PYTHONPATH=. pytest tests/test_supervisor_behavior.py tests/test_check.py -q
+```
+
+Run lint:
+
+```bash
+uv run ruff check .
+```
+
+`basedpyright` is currently noisy and not a useful required gate for this phase.
+
+## Invariant Summary
+
+- Filesystem state determines capture classification.
+- A session has one timestamp and at most one final media artifact.
+- Metadata writes are validated and atomic.
+- `focus_domain` is a primary tag stored separately from regular `tags`.
+- Tag typo input resolves to canonical values before stored-data validation.
+- Prompt validation re-prompts when the user can correct input.
 
 ## Troubleshooting
 
-- No output file → check `logs/` for the session log
-- Capture fails immediately → verify `VIDEO_DEV` and `AUDIO_SRC` in `config/env`
-- Audio missing or wrong source → run `pactl list short sources` and update `AUDIO_SRC`
-- VAAPI error → run `ffmpeg -hwaccels | grep vaapi` to confirm hardware support
-- Python package not found → verify PATH includes `$HOME/.local/bin`
+- No output file: check `logs/` for the session log.
+- Capture fails immediately: verify `VIDEO_DEV` and `AUDIO_SRC` in `config/env`.
+- Metadata validation fails: check [docs/metadata.md](docs/metadata.md) and [docs/test.md](docs/test.md).
+- Enrichment rejects a tag or focus domain: check [docs/enrichment.md](docs/enrichment.md) and [docs/tags.md](docs/tags.md).
