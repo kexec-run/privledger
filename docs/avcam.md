@@ -86,11 +86,13 @@ parse CLI options
   -> set output connection frame durations when connections are available
   -> set audio output codec settings when audio is present
   -> commitConfiguration()
+  -> install SIGINT/SIGTERM handlers before session start
   -> startRunning()
   -> lock camera for configuration
   -> set activeFormat and active video min/max frame durations
   -> unlock camera
   -> pin output connection frame durations again
+  -> check whether a stop was requested during setup
   -> startRecording(to:recordingDelegate:)
   -> wait for didStartRecordingTo
   -> wait for --seconds, SIGINT, or SIGTERM
@@ -177,15 +179,26 @@ duration=28.500000
 
 Video-only `AVCaptureMovieFileOutput` was not reliable enough as the default path; it could produce lower average frame rate even after capture was pinned. Adding audio with ALAC produced stable 1080p30 output and finalized cleanly.
 
-## Format Exposure
+## Format Index Discovery
 
-macOS AVFoundation exposes the Brio 100 as YUV-like formats only:
+Get format indexes with:
+```bash
+cd /path/to/repo/tools/avcam-cli/.build/release
+./avcam-cli formats --camera "Brio"
+```
 
+The number in square brackets is the `--format-index` value. For example:
 ```text
 [35] 1920x1080 420v fps: 30.000-30.000 fps, 24.000-24.000 fps, 20-20 fps, 15.000-15.000 fps, 10-10 fps, 7.500-7.500 fps, 5-5 fps
 [36] 1920x1080 yuvs fps: 5-5 fps
 ```
+Use it explicitly with:
 
+```bash
+./avcam-cli record --camera "Brio" --audio "Brio" --audio-codec alac --format-index 35 --fps 30 --out brio-1080p30-alac.mov
+```
+
+macOS AVFoundation exposes the Brio 100 as YUV-like formats only.
 Linux `v4l2-ctl` exposes native `MJPG 1920x1080@30` for the same camera. On macOS, the public AVFoundation format list does not expose `MJPG`, `dmb1`, or `jpeg` for this device. The working macOS path records H.264 from AVFoundation-delivered `420v`/NV12 samples.
 
 ## FFmpeg AVFoundation Failure Mode
@@ -289,7 +302,7 @@ ffprobe -v error -show_entries stream=index,codec_type,codec_name,width,height,a
 
 Pass `--verbose` to `record` to print the Chromium-style ordering note, active format after session start, and movie output connection frame-duration details.
 
-`record` can run until Ctrl+C/SIGTERM, or stop automatically when `--seconds` is provided. Every stop path requests `AVCaptureMovieFileOutput.stopRecording()`, keeps the `AVCaptureSession` running while it waits for `didFinishRecordingTo`, and pumps the main run loop so AVFoundation delegate delivery is not starved by a blocking CLI sleep. The session stops only after the finish callback arrives, or after `--finalize-timeout` seconds with an explicit timeout error.
+`record` can run until Ctrl+C/SIGTERM, or stop automatically when `--seconds` is provided. Signal handlers are installed before session start, so SIGINT/SIGTERM during setup is routed through the recorder stop state instead of default process termination where possible. Every stop path requests `AVCaptureMovieFileOutput.stopRecording()` after file output has started, keeps the `AVCaptureSession` running while it waits for `didFinishRecordingTo`, and pumps the main run loop so AVFoundation delegate delivery is not starved by a blocking CLI sleep. The session stops only after the finish callback arrives, or after `--finalize-timeout` seconds with an explicit timeout error.
 
 
 ## Privledger Boundary
