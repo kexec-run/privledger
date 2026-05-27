@@ -670,6 +670,7 @@ struct AvcamCLI {
         print("Output: \(outURL.path)")
 
         let delegate = RecordingDelegate()
+        let stopController = installStopSignalHandlers()
         if verbose {
             print("Chromium-style record ordering: connection frame durations, startRunning(), activeFormat, then startRecording().")
         }
@@ -678,6 +679,10 @@ struct AvcamCLI {
             throw CLIError.recordingFailed("AVCaptureSession did not start.")
         }
 
+        if stopController.snapshot().requested {
+            session.stopRunning()
+            throw CLIError.recordingFailed("Recording stopped before capture started.")
+        }
         try configure(device: device, choice: choice, fps: fps, exposure: exposure)
         configureOutputConnections(output, choice: choice)
         try configureAudioOutputSettings(output, audioCodec: audioCodec)
@@ -691,13 +696,16 @@ struct AvcamCLI {
             }
         }
 
+        if stopController.snapshot().requested {
+            session.stopRunning()
+            throw CLIError.recordingFailed("Recording stopped before file output started.")
+        }
         output.startRecording(to: outURL, recordingDelegate: delegate)
         guard delegate.waitUntilStarted(timeout: .now() + 10) else {
             session.stopRunning()
             throw CLIError.recordingFailed("Recording did not start within 10 seconds.")
         }
 
-        let stopController = installStopSignalHandlers()
         waitForStopRequest(seconds: seconds, stopController: stopController)
         let stop = stopController.snapshot()
         let stopStarted = Date()
