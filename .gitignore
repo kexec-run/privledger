@@ -20,6 +20,9 @@ config/env
 *.tmp.*
 *.temp.*
 
+# Local Swift build output
+tools/avcam-cli/.build/
+
 # Python
 __pycache__/
 *.pyc
