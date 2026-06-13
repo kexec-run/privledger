@@ -19,6 +19,12 @@ python3 scripts/privledger.py
 
 `scripts/privledger.py` detects macOS with `platform.system() == "Darwin"` and uses `scripts/record-mac.sh`. Other platforms use `scripts/record-linux.sh`.
 
+Record and immediately open metadata enrichment after a clean non-bad artifact:
+
+```bash
+python3 scripts/privledger.py --enrich
+```
+
 Enrich an existing session:
 
 ```bash

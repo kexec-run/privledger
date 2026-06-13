@@ -25,6 +25,7 @@ def run_supervisor(
     recorder_exit,
     writer=None,
     config=None,
+    enrich_after_record=False,
 ):
     vlog_dir = tmp_path / "vlog"
     scripts_dir = tmp_path / "scripts"
@@ -97,7 +98,7 @@ def run_supervisor(
         monkeypatch.setattr(privledger, "write_metadata_atomic", writer)
 
     with pytest.raises(SystemExit) as exc:
-        privledger.supervise_capture(config)
+        privledger.supervise_capture(config, enrich_after_record=enrich_after_record)
 
     return exc.value.code, vlog_dir
 
@@ -189,6 +190,46 @@ class TestSupervisorRecordingMatrix:
         assert (vlog_dir / "2026-05-24-0630.mkv").exists()
         assert not (vlog_dir / "2026-05-24-0630.json").exists()
 
+    def test_enrich_runs_after_successful_good_capture(self, monkeypatch, tmp_path):
+        enriched = []
+
+        monkeypatch.setattr(
+            privledger,
+            "run_enrichment",
+            lambda metadata_path: enriched.append(metadata_path.name),
+        )
+
+        code, _vlog_dir = run_supervisor(
+            monkeypatch,
+            tmp_path,
+            artifact="good",
+            recorder_exit=0,
+            enrich_after_record=True,
+        )
+
+        assert code == 0
+        assert enriched == ["2026-05-24-0630.json"]
+
+    def test_enrich_does_not_run_for_bad_artifact(self, monkeypatch, tmp_path):
+        enriched = []
+
+        monkeypatch.setattr(
+            privledger,
+            "run_enrichment",
+            lambda metadata_path: enriched.append(metadata_path.name),
+        )
+
+        code, _vlog_dir = run_supervisor(
+            monkeypatch,
+            tmp_path,
+            artifact="bad",
+            recorder_exit=1,
+            enrich_after_record=True,
+        )
+
+        assert code == 1
+        assert enriched == []
+
     def test_macos_capture_uses_mov_artifact_names(self, monkeypatch, tmp_path):
         record_script = tmp_path / "scripts" / "record-mac.sh"
         config = privledger.RecorderConfig(
@@ -220,28 +261,58 @@ class TestPlatformSelection:
     def test_main_selects_macos_config_on_darwin(self, monkeypatch):
         selected = []
 
+        monkeypatch.setattr(privledger.sys, "argv", ["privledger.py"])
         monkeypatch.setattr(privledger.platform, "system", lambda: "Darwin")
         monkeypatch.setattr(
-            privledger, "supervise_capture", lambda config: selected.append(config)
+            privledger,
+            "supervise_capture",
+            lambda config, enrich_after_record=False: selected.append(
+                (config, enrich_after_record)
+            ),
         )
 
         privledger.main()
 
-        assert selected[0].name == "privledger-mac"
-        assert selected[0].good_suffix == ".mov"
+        assert selected[0][0].name == "privledger-mac"
+        assert selected[0][0].good_suffix == ".mov"
+        assert selected[0][1] is False
 
     def test_main_selects_linux_config_when_not_darwin(self, monkeypatch):
         selected = []
 
+        monkeypatch.setattr(privledger.sys, "argv", ["privledger.py"])
         monkeypatch.setattr(privledger.platform, "system", lambda: "Linux")
         monkeypatch.setattr(
-            privledger, "supervise_capture", lambda config: selected.append(config)
+            privledger,
+            "supervise_capture",
+            lambda config, enrich_after_record=False: selected.append(
+                (config, enrich_after_record)
+            ),
         )
 
         privledger.main()
 
-        assert selected[0].name == "privledger-linux"
-        assert selected[0].good_suffix == ".mkv"
+        assert selected[0][0].name == "privledger-linux"
+        assert selected[0][0].good_suffix == ".mkv"
+        assert selected[0][1] is False
+
+    def test_main_passes_enrich_flag(self, monkeypatch):
+        selected = []
+
+        monkeypatch.setattr(privledger.sys, "argv", ["privledger.py", "--enrich"])
+        monkeypatch.setattr(privledger.platform, "system", lambda: "Darwin")
+        monkeypatch.setattr(
+            privledger,
+            "supervise_capture",
+            lambda config, enrich_after_record=False: selected.append(
+                (config, enrich_after_record)
+            ),
+        )
+
+        privledger.main()
+
+        assert selected[0][0].name == "privledger-mac"
+        assert selected[0][1] is True
 
 
 class TestCustomSchemaLoading:

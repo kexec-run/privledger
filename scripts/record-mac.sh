@@ -178,5 +178,10 @@ mv "${TMP_FILE}" "${OUT_FILE}"
 
 echo "[record-mac] Capture complete -> ${OUT_FILE}" | tee -a "${LOG_FILE}"
 echo "[record-mac] Duration: ${DURATION}s" | tee -a "${LOG_FILE}"
+echo "[record-mac] ffprobe streams:" | tee -a "${LOG_FILE}"
+ffprobe -v error \
+  -show_entries stream=index,codec_type,codec_name,width,height,avg_frame_rate,r_frame_rate,pix_fmt,duration,sample_rate,channels \
+  -of default=nw=1 \
+  "${OUT_FILE}" | tee -a "${LOG_FILE}"
 
 exit 0

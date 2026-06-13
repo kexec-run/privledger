@@ -40,6 +40,12 @@ Run capture:
 python3 scripts/privledger.py
 ```
 
+Run capture and open enrichment after a clean recording:
+
+```bash
+python3 scripts/privledger.py --enrich
+```
+
 Enrich metadata:
 
 ```bash
@@ -142,6 +148,12 @@ python3 scripts/privledger.py
 ```
 
 Press `Ctrl+C` to stop recording with graceful shutdown.
+
+To open enrichment automatically after a clean non-bad recording:
+
+```bash
+python3 scripts/privledger.py --enrich
+```
 
 Output is written to `vlog/`:
 

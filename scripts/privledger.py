@@ -178,7 +178,22 @@ def classify_artifact(config: RecorderConfig, timestamp: str):
     return bad_path, "bad"
 
 
-def supervise_capture(config: RecorderConfig):
+def run_enrichment(metadata_path: Path):
+    enrich_script = ROOT_DIR / "scripts" / "enrich.py"
+    if not enrich_script.exists():
+        print("[privledger] ERROR: enrich.py not found", file=sys.stderr)
+        sys.exit(1)
+
+    result = subprocess.run([sys.executable, str(enrich_script), str(metadata_path)])
+    if result.returncode != 0:
+        print(
+            f"[privledger] ERROR: enrich.py failed with exit {result.returncode}",
+            file=sys.stderr,
+        )
+        sys.exit(result.returncode)
+
+
+def supervise_capture(config: RecorderConfig, enrich_after_record: bool = False):
     global proc
 
     env, schema_version, pipeline_version = load_config_env(config)
@@ -266,15 +281,30 @@ def supervise_capture(config: RecorderConfig):
         )
         sys.exit(exit_code)
 
+    if enrich_after_record:
+        run_enrichment(metadata_path)
+
     print(f"[{config.name}] Capture finished cleanly.", flush=True)
     sys.exit(0)
 
 
 def main():
+    args = sys.argv[1:]
+    allowed_args = {"--enrich"}
+    unknown_args = [arg for arg in args if arg not in allowed_args]
+    if unknown_args:
+        print(
+            f"Usage: privledger.py [--enrich]\nUnknown argument: {unknown_args[0]}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    enrich_after_record = "--enrich" in args
+
     if platform.system() == "Darwin":
-        supervise_capture(mac_config())
+        supervise_capture(mac_config(), enrich_after_record=enrich_after_record)
     else:
-        supervise_capture(linux_config())
+        supervise_capture(linux_config(), enrich_after_record=enrich_after_record)
 
 
 if __name__ == "__main__":

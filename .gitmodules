@@ -1,0 +1,3 @@
+[submodule "tools/avcam-cli"]
+	path = tools/avcam-cli
+	url = git@github.com:kexec-run/avcam-cli.git
