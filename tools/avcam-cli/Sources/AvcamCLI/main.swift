@@ -372,6 +372,17 @@ struct AvcamCLI {
             let options = try Options(args.dropFirst())
             let device = try selectDevice(matching: try options.string("camera"))
             printFormats(for: device)
+        case "codecs":
+            try ensureCameraAccess()
+            let options = try Options(args.dropFirst())
+            let device = try selectDevice(matching: try options.string("camera"))
+            let width = try options.int("width", default: 1920)
+            let height = try options.int("height", default: 1080)
+            let fps = try options.double("fps", default: 30)
+            let subtype = options.values["subtype"]
+            let formatIndex = try options.optionalInt("format-index")
+            let exposure = try exposureConfig(options: options)
+            try printVideoCodecs(device: device, width: width, height: height, fps: fps, subtype: subtype, formatIndex: formatIndex, exposure: exposure)
         case "record":
             try ensureCameraAccess()
             let options = try Options(args.dropFirst())
@@ -422,6 +433,7 @@ struct AvcamCLI {
     Usage:
       avcam-cli list
       avcam-cli formats --camera "Brio"
+      avcam-cli codecs --camera "Brio" --format-index 35 --fps 30
       avcam-cli record --camera "Brio" --audio "Brio" --audio-codec alac --format-index 35 --fps 30 --out brio-1080p30-alac.mov
       avcam-cli record --camera "Brio" --audio "Brio" --audio-codec alac --format-index 35 --fps 30 --seconds 10 --out brio-1080p30-alac.mov
       avcam-cli record --camera "Brio" --audio "Brio" --audio-codec aac --format-index 35 --fps 30 --seconds 10 --out brio-1080p30-aac.mov
@@ -727,6 +739,61 @@ struct AvcamCLI {
         }
         print("Finished recording: \(outURL.path)")
         print("Inspect with: ffprobe -v error -show_entries stream=index,codec_type,codec_name,width,height,avg_frame_rate,r_frame_rate,pix_fmt,duration,sample_rate,channels -of default=nw=1 \(shellQuote(outURL.path))")
+    }
+
+    static func printVideoCodecs(
+        device: AVCaptureDevice,
+        width: Int,
+        height: Int,
+        fps: Double,
+        subtype: String?,
+        formatIndex: Int?,
+        exposure: ExposureConfig
+    ) throws {
+        let choice = try selectFormat(device: device, width: width, height: height, fps: fps, subtype: subtype, formatIndex: formatIndex)
+        let session = AVCaptureSession()
+        session.beginConfiguration()
+        setInputPriorityPresetIfAvailable(session, verbose: false)
+
+        let input = try AVCaptureDeviceInput(device: device)
+        guard session.canAddInput(input) else {
+            session.commitConfiguration()
+            throw CLIError.cannotAddInput("Cannot add input for camera \(device.localizedName).")
+        }
+        session.addInput(input)
+
+        let output = AVCaptureVideoDataOutput()
+        output.videoSettings = [
+            kCVPixelBufferWidthKey as String: Int(choice.dimensions.width),
+            kCVPixelBufferHeightKey as String: Int(choice.dimensions.height),
+            kCVPixelBufferPixelFormatTypeKey as String: Int(choice.subtype),
+            AVVideoScalingModeKey: AVVideoScalingModeResizeAspectFill
+        ]
+        guard session.canAddOutput(output) else {
+            session.commitConfiguration()
+            throw CLIError.cannotAddOutput("Cannot add AVCaptureVideoDataOutput.")
+        }
+        session.addOutput(output)
+        session.commitConfiguration()
+
+        try configure(device: device, choice: choice, fps: fps, exposure: exposure)
+
+        let fileType: AVFileType = .mov
+        let codecs = output.availableVideoCodecTypesForAssetWriter(writingTo: fileType)
+        print("Selected camera: \(device.localizedName)")
+        print("Selected format: [\(choice.index)] \(choice.dimensions.width)x\(choice.dimensions.height) \(fourCC(choice.subtype)) @ \(trim(choice.matchingRange.minFrameRate))-\(trim(choice.matchingRange.maxFrameRate)) fps")
+        print("AssetWriter file type: \(fileType.rawValue)")
+        print("Available video codecs:")
+        for codec in codecs {
+            print("  \(codec.rawValue)")
+        }
+        print("HEVC available: \(codecs.contains(.hevc) ? "true" : "false")")
+
+        if codecs.contains(.hevc) {
+            let settings = output.recommendedVideoSettings(forVideoCodecType: .hevc, assetWriterOutputFileType: fileType) ?? [:]
+            print("HEVC recommended settings:")
+            print(formatSettings(settings, indentation: "  "))
+        }
     }
 
     static func probe(
@@ -1036,6 +1103,22 @@ struct AvcamCLI {
         default:
             throw CLIError.usage("--audio-codec must be aac, alac, or pcm")
         }
+    }
+
+    static func formatSettings(_ value: Any, indentation: String) -> String {
+        if let dict = value as? [String: Any] {
+            if dict.isEmpty {
+                return "\(indentation){}"
+            }
+            return dict.keys.sorted().map { key in
+                let child = dict[key]!
+                if child is [String: Any] {
+                    return "\(indentation)\(key):\n\(formatSettings(child, indentation: indentation + "  "))"
+                }
+                return "\(indentation)\(key): \(child)"
+            }.joined(separator: "\n")
+        }
+        return "\(indentation)\(value)"
     }
 
     static func exposureConfig(options: Options) throws -> ExposureConfig {

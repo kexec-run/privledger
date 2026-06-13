@@ -23,8 +23,9 @@ Each layer owns one class of responsibility. Cross-layer leakage should be treat
 | Layer | Owns | Must Not Own |
 |---|---|---|
 | `config/` | local runtime inputs and controlled vocabulary files | capture classification or validation logic |
-| `scripts/record.sh` | media capture, temporary file lifecycle, final media artifact | metadata classification |
-| `scripts/privledger.py` | orchestration, timestamp generation, artifact classification | user enrichment prompts |
+| `scripts/record-linux.sh` / `scripts/record-mac.sh` | media capture, temporary file lifecycle, final media artifact | metadata classification |
+| `scripts/privledger.py` | platform detection, shared orchestration, timestamp generation, artifact classification, metadata write | user enrichment prompts |
+| `scripts/privledger-linux.py` / `scripts/privledger-mac.py` | debug-only platform recorder configuration shims | duplicated metadata logic |
 | filesystem | capture outcome evidence | schema interpretation |
 | `metadata/writer.py` | metadata construction, invariant check, schema validation, atomic write | user interaction |
 | `metadata/check.py` | strict stored-data invariants | fuzzy typo correction |
@@ -40,17 +41,18 @@ Each layer owns one class of responsibility. Cross-layer leakage should be treat
 ```text
 user
 ↓
-scripts/privledger.py        # load env + schema, generate timestamp, supervise process
+scripts/privledger.py        # detect platform, load env/schema, timestamp, supervision, metadata write
 ↓
-scripts/record.sh            # device checks, run ffmpeg, manage lifecycle
+scripts/record-linux.sh      # Linux: device checks, run ffmpeg, manage lifecycle
+or scripts/record-mac.sh     # macOS: run avcam-cli, manage lifecycle
 ↓
-ffmpeg                       # capture → temp file (TS.mkv.tmp.<pid>)
+ffmpeg or avcam-cli          # capture → temp file
 ↓
-record.sh                    # validate duration advisory, finalize media artifact
+record script                # validate duration advisory, finalize media artifact
 ↓
 filesystem
-├── TS.mkv                   # successful artifact
-├── TS.mkv.bad.mkv           # degraded artifact
+├── TS.mkv / TS.mov          # successful artifact
+├── TS.mkv.bad.mkv / TS.mov.bad.mov
 └── no file                  # preflight failure
 ↓
 scripts/privledger.py        # classify state from filesystem
@@ -74,10 +76,11 @@ vlog/TS.json
 
 | Stage | Input | Output | Purpose |
 |---|---|---|---|
-| `privledger.py` | env + schema | timestamp + recorder process | orchestrate capture |
-| `record.sh` | timestamp + env | `.mkv`, `.bad.mkv`, or no artifact | produce media artifact |
+| `privledger.py` | platform + env + schema | timestamp + recorder process + metadata | platform selection and shared supervision |
+| `privledger-linux.py` / `privledger-mac.py` | debug flag | forced platform config | platform-specific debugging only |
+| `record-linux.sh` / `record-mac.sh` | timestamp + env | media artifact, bad artifact, or no artifact | produce media artifact |
 | `ffmpeg` | devices | temp media file | encode audio/video |
-| `record.sh` post | temp file | final media artifact | validate + finalize |
+| recorder script post | temp file | final media artifact | validate + finalize |
 | `privledger.py` post | filesystem | classification | determine outcome |
 | `writer.py` | metadata fields | `.json` | validate + persist |
 | `enrich.py` | existing `.json` | updated `.json` | user-driven enrichment |
@@ -88,9 +91,11 @@ Exactly one of these should exist per session:
 
 - `TS.mkv`
 - `TS.mkv.bad.mkv`
+- `TS.mov`
+- `TS.mov.bad.mov`
 - no media artifact
 
-Both `TS.mkv` and `TS.mkv.bad.mkv` for the same timestamp is an invariant violation.
+Both good and bad artifacts for the same timestamp are an invariant violation. For example, `TS.mkv` plus `TS.mkv.bad.mkv`, or `TS.mov` plus `TS.mov.bad.mov`.
 
 Metadata exists only if a media artifact exists and metadata validation succeeds.
 
@@ -150,7 +155,10 @@ Generated artifacts and local data volume details are omitted.
 ├── scripts/ - command entrypoints and orchestration
 │   ├── enrich.py
 │   ├── privledger.py
-│   ├── record.sh
+│   ├── privledger-linux.py
+│   ├── privledger-mac.py
+│   ├── record-linux.sh
+│   ├── record-mac.sh
 │   └── test_writer.py
 ├── tests/ - behavior and schema verification
 │   ├── schema/

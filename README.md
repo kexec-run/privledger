@@ -147,8 +147,10 @@ Output is written to `vlog/`:
 
 ```text
 vlog/
-  TS.mkv
-  TS.mkv.bad.mkv   degraded capture
+  TS.mkv           Linux successful capture
+  TS.mkv.bad.mkv   Linux degraded capture
+  TS.mov           macOS successful capture
+  TS.mov.bad.mov   macOS degraded capture
   TS.json          metadata
 ```
 

@@ -317,15 +317,18 @@ Pass `--verbose` to `record` to print the Chromium-style ordering note, active f
 - waiting for `didFinishRecordingTo`
 - final recorder exit code
 
-`record-macos.sh` should own Privledger artifact handling:
+`record-mac.sh` should own Privledger artifact handling:
 
 - read `TIMESTAMP` and macOS recorder env
 - create `vlog/` and `logs/`
 - write to a temp media file
 - run `avcam-cli`
-- forward signals to `avcam-cli`
+- keep `avcam-cli` terminal-attached during capture because redirected wrapper execution can affect macOS camera permission
+- allow process-group signals to reach `avcam-cli`
 - validate the produced media with `ffprobe`
 - atomically move temp output to the final artifact
 - mark degraded output as `.bad`
 
-`privledger.py` should remain the supervisor: it owns timestamp creation, recorder process supervision, filesystem-based artifact classification, metadata writing, and final pipeline exit behavior. Later it can choose `record.sh` or `record-macos.sh` based on OS.
+The standalone script defaults to `AVCAM_CAMERA=Brio`, `AVCAM_AUDIO=Brio`, `AVCAM_AUDIO_CODEC=alac`, `AVCAM_FORMAT_INDEX=35`, `AVCAM_FPS=30`, and writes `vlog/${TIMESTAMP}.mov`. If `TIMESTAMP` is absent, it creates one from UTC time. `AVCAM_SECONDS` is optional; when absent, `avcam-cli` records until SIGINT/SIGTERM.
+
+`privledger.py` is the normal supervisor and metadata path: it detects macOS with `platform.system() == "Darwin"` and otherwise uses the Linux path. It owns timestamp creation, recorder process supervision, filesystem-based artifact classification, metadata writing, and final pipeline exit behavior. `privledger-mac.py` and `privledger-linux.py` are debug-only platform shims.

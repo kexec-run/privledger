@@ -56,6 +56,7 @@ Deferred fields:
 |---|---|---|
 | tag/focus predicates | `metadata/tags.py` | vocabulary loading, regular tag checks, focus-domain checks |
 | semantic invariants | `metadata/check.py` | stored-data validation before schema validation |
+| custom schema loading | `metadata/custom_schema.py` | YAML field/type normalization and schema hash generation |
 | schema validation | `metadata/validator.py` | JSON schema enforcement |
 | persistence | `metadata/writer.py` | construction, validation order, atomic write |
 
@@ -91,6 +92,13 @@ Schema invariants:
 - unknown fields are rejected
 - enum fields must use known values
 - `transcript_file` is `null` or a non-empty string
+
+Custom metadata invariants:
+
+- when `CUSTOM_ENABLED=false`, capture metadata omits `custom`
+- when `CUSTOM_ENABLED=true`, initial capture metadata includes `custom: null`
+- malformed `config/custom_schema.yaml` fails before recording starts with a clean Privledger error
+- enriched custom metadata must use the active schema envelope: `{"schema_hash": "...", "data": {...}}`
 
 ## Tag Helper Boundary
 

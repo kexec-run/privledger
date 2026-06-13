@@ -17,6 +17,8 @@ Record a session:
 python3 scripts/privledger.py
 ```
 
+`scripts/privledger.py` detects macOS with `platform.system() == "Darwin"` and uses `scripts/record-mac.sh`. Other platforms use `scripts/record-linux.sh`.
+
 Enrich an existing session:
 
 ```bash
@@ -51,6 +53,8 @@ Possible media outcomes:
 
 - `TS.mkv`
 - `TS.mkv.bad.mkv`
+- `TS.mov`
+- `TS.mov.bad.mov`
 - no media artifact
 
 Metadata is written as:
