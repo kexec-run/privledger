@@ -108,9 +108,9 @@ The key invariant is that `AVCaptureSession` stays alive until `AVCaptureMovieFi
 Command:
 
 ```bash
-cd /path/to/repo/tools/avcam-cli/.build/release
+cd tools/avcam-cli
 
-./avcam-cli probe --camera "Brio" --format-index 35 --fps 30 --seconds 10 --output-mode native
+.build/release/avcam-cli probe --camera "Brio" --format-index 35 --fps 30 --seconds 10 --output-mode native
 ```
 
 Important output:
@@ -134,9 +134,9 @@ The stable MVP recording path is `AVCaptureMovieFileOutput` with Brio video plus
 Command:
 
 ```bash
-cd /path/to/repo/tools/avcam-cli/.build/release
+cd tools/avcam-cli
 
-./avcam-cli record --camera "Brio" --audio "Brio" --audio-codec alac --format-index 35 --fps 30 --out ctrlc-test.mov --verbose
+.build/release/avcam-cli record --camera "Brio" --audio "Brio" --audio-codec alac --format-index 35 --fps 30 --out ctrlc-test.mov --verbose
 ```
 
 Stop with Ctrl+C. Important output:
@@ -144,7 +144,7 @@ Stop with Ctrl+C. Important output:
 ```text
 Recording stop requested by SIGINT; waiting up to 5s for MovieFileOutput to finish writing.
 Recording finished in 0.071s after stopRecording().
-Finished recording: /path/to/repo/tools/avcam-cli/.build/release/ctrlc-test.mov
+Finished recording: /path/to/repo/tools/avcam-cli/ctrlc-test.mov
 ```
 
 Verification:
@@ -183,8 +183,8 @@ Video-only `AVCaptureMovieFileOutput` was not reliable enough as the default pat
 
 Get format indexes with:
 ```bash
-cd /path/to/repo/tools/avcam-cli/.build/release
-./avcam-cli formats --camera "Brio"
+cd tools/avcam-cli
+.build/release/avcam-cli formats --camera "Brio"
 ```
 
 The number in square brackets is the `--format-index` value. For example:
@@ -251,8 +251,8 @@ Chromium-style ordering
 Build the release binary with:
 
 ```bash
-cd /path/to/repo/tools/avcam-cli
-./build.sh
+cd tools/avcam-cli
+swift build -c release
 ```
 
 The script writes:
