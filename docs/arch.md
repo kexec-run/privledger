@@ -169,7 +169,7 @@ Generated artifacts and local data volume details are omitted.
 │   └── test_writer_invariants.py
 ├── vlog/ - durable media and metadata store
 │   ├── .gitkeep
-│   └── TS.json / TS.mkv / TS.mkv.bad.mkv
+│   └── TS.json / TS.mkv / TS.mkv.bad.mkv / TS.mov / TS.mov.bad.mov
 ├── .pre-commit-config.yaml
 ├── AGENTS.md
 ├── README.md
@@ -181,4 +181,4 @@ Generated artifacts and local data volume details are omitted.
 
 - The current CLI prompt is linear. It rejects invalid focus/tag states and re-prompts, but it does not yet offer a full tag-removal UI.
 - The test matrix currently records a supervisor deviation: a `.bad.mkv` artifact with recorder exit `0` should be treated as failure, but the current behavior still returns success.
-- Webcam-dependent recording behavior is tested through mocks because local macOS camera capture is not available in this environment.
+- Webcam-dependent recording behavior is tested through mocks unless the process has macOS camera and microphone permission.

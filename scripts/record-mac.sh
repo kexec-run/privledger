@@ -45,9 +45,8 @@ echo "[record-mac] Starting capture at ${TIMESTAMP}" | tee -a "${LOG_FILE}"
 # Configuration
 ###############################################################################
 
-AVCAM_CLI="${AVCAM_CLI:-${ROOT_DIR}/tools/avcam-cli/.build/release/avcam-cli}"
-AVCAM_CLI_DIR="$(cd "$(dirname "${AVCAM_CLI}")" && pwd)"
-AVCAM_CLI_BIN="$(basename "${AVCAM_CLI}")"
+AVCAM_CLI_ROOT="${AVCAM_CLI_ROOT:-${ROOT_DIR}/tools/avcam-cli}"
+AVCAM_CLI="${AVCAM_CLI:-${AVCAM_CLI_ROOT}/.build/release/avcam-cli}"
 AVCAM_CAMERA="${AVCAM_CAMERA:-Brio}"
 AVCAM_AUDIO="${AVCAM_AUDIO:-Brio}"
 AVCAM_AUDIO_CODEC="${AVCAM_AUDIO_CODEC:-alac}"
@@ -76,7 +75,26 @@ finalize_bad() {
 ###############################################################################
 
 if [[ ! -x "${AVCAM_CLI}" ]]; then
-  echo "[record-mac] ERROR: avcam-cli missing or not executable: ${AVCAM_CLI}" | tee -a "${LOG_FILE}"
+  if [[ ! -f "${AVCAM_CLI_ROOT}/Package.swift" ]]; then
+    echo "[record-mac] ERROR: avcam-cli missing or not executable: ${AVCAM_CLI}" | tee -a "${LOG_FILE}"
+    echo "[record-mac] ERROR: Swift package root not found: ${AVCAM_CLI_ROOT}" | tee -a "${LOG_FILE}"
+    exit 1
+  fi
+
+  if ! command -v swift >/dev/null 2>&1; then
+    echo "[record-mac] ERROR: avcam-cli missing and swift is not available to build it" | tee -a "${LOG_FILE}"
+    exit 1
+  fi
+
+  echo "[record-mac] Building avcam-cli with SwiftPM" | tee -a "${LOG_FILE}"
+  if ! (cd "${AVCAM_CLI_ROOT}" && swift build -c release >> "${LOG_FILE}" 2>&1); then
+    echo "[record-mac] ERROR: failed to build avcam-cli" | tee -a "${LOG_FILE}"
+    exit 1
+  fi
+fi
+
+if [[ ! -x "${AVCAM_CLI}" ]]; then
+  echo "[record-mac] ERROR: avcam-cli build completed but binary is missing or not executable: ${AVCAM_CLI}" | tee -a "${LOG_FILE}"
   exit 1
 fi
 
@@ -97,10 +115,8 @@ fi
 # AVFoundation camera permission can be denied when the unsigned CLI is launched
 # with redirected output from a wrapper. Terminal-attached execution preserves
 # the same capture permission behavior as direct avcam-cli invocation.
-###############################################################################
-
 AVCAM_CMD=(
-  "./${AVCAM_CLI_BIN}"
+  "${AVCAM_CLI}"
   record
   --camera "${AVCAM_CAMERA}"
   --audio "${AVCAM_AUDIO}"
@@ -116,7 +132,7 @@ if [[ -n "${AVCAM_SECONDS:-}" ]]; then
 fi
 
 set +e
-pushd "${AVCAM_CLI_DIR}" >/dev/null
+pushd "${AVCAM_CLI_ROOT}" >/dev/null
 "${AVCAM_CMD[@]}"
 AVCAM_EXIT=$?
 popd >/dev/null

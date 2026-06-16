@@ -23,6 +23,11 @@ config/env
 # Local Swift build output
 tools/avcam-cli/.build/
 
+# Local-only agent/tooling files
+.pre-commit-config.yaml
+.serena/
+AGENTS.md
+
 # Python
 __pycache__/
 *.pyc

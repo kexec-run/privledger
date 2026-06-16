@@ -73,9 +73,9 @@ Logs are written under `logs/` and are disposable. `vlog/` is durable state.
 
 ## macOS Testing Constraint
 
-Webcam-backed recording is not available in this environment.
+Webcam-backed recording requires a macOS process context with Camera and Microphone permission.
 
-Recording behavior should be tested with mocked artifacts and mocked recorder outcomes. The tests should verify behavior from filesystem state rather than relying on real camera access.
+Sandboxed automation can report `Camera access is denied` even when the same command works in an approved terminal. In CI or non-camera environments, recording behavior should be tested with mocked artifacts and mocked recorder outcomes. The tests should verify behavior from filesystem state rather than relying on real camera access.
 
 ## Verification Baseline
 
