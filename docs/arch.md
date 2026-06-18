@@ -7,6 +7,7 @@ For operational docs, see:
 - [operations.md](./operations.md) - setup, commands, recording, and verification
 - [metadata.md](./metadata.md) - schema fields, writers, validation, and tag/focus invariants
 - [enrichment.md](./enrichment.md) - user-editable metadata, prompts, typo resolution, and re-prompt behavior
+- [transcript.md](./transcript.md) - transcript sidecars, metadata linking, and translation artifacts
 - [tags.md](./tags.md) - tag semantics and vocabulary rules
 - [test.md](./test.md) - behavior matrix and failure cases
 
@@ -28,6 +29,7 @@ Each layer owns one class of responsibility. Cross-layer leakage should be treat
 | `scripts/privledger-linux.py` / `scripts/privledger-mac.py` | debug-only platform recorder configuration shims | duplicated metadata logic |
 | filesystem | capture outcome evidence | schema interpretation |
 | `metadata/writer.py` | metadata construction, invariant check, schema validation, atomic write | user interaction |
+| `metadata/rewrite.py` | allowed-field metadata rewrites and narrow transcript link patches | prompt UI or transcript generation |
 | `metadata/check.py` | strict stored-data invariants | fuzzy typo correction |
 | `metadata/tags.py` | exact tag vocabulary loading and tag/focus predicates | prompt UI |
 | `metadata/custom_schema.py` | custom metadata schema loading and type normalization | prompt rendering or persistence |
@@ -67,7 +69,21 @@ Optional enrichment:
 ```text
 scripts/enrich.py            # load TS.json → prompt user → update mutable fields
 ↓
+metadata/rewrite.py          # enforce allowed fields
+↓
 metadata/writer.py           # validate + atomic overwrite
+↓
+vlog/TS.json
+```
+
+Optional transcription:
+
+```text
+scripts/transcribe_batch.py  # media artifact → source transcript sidecar
+↓
+metadata/rewrite.py          # patch transcript_file + metadata_quality only
+↓
+metadata/writer.py           # atomic overwrite primitive
 ↓
 vlog/TS.json
 ```
@@ -83,7 +99,9 @@ vlog/TS.json
 | recorder script post | temp file | final media artifact | validate + finalize |
 | `privledger.py` post | filesystem | classification | determine outcome |
 | `writer.py` | metadata fields | `.json` | validate + persist |
+| `rewrite.py` | existing `.json` + allowed updates | updated `.json` | constrain rewrite surface |
 | `enrich.py` | existing `.json` | updated `.json` | user-driven enrichment |
+| `transcribe_batch.py` | good media artifact + metadata | transcript sidecar + metadata link | source-language transcription |
 
 ## Artifact Model
 
@@ -107,7 +125,7 @@ These invariants describe boundaries that should remain true as the project evol
 - A2: A session has one timestamp and at most one final media artifact.
 - A3: Metadata is written only after media artifact classification succeeds.
 - A4: Media artifacts are not deleted when metadata validation or writing fails.
-- A5: `metadata/writer.py` is the only production path that constructs and atomically writes metadata.
+- A5: `metadata/writer.py` owns the atomic JSON write primitive used by production metadata write paths.
 - A6: `metadata/check.py` validates stored-data invariants strictly; it does not interpret typos.
 - A7: `metadata/tags.py` owns exact tag vocabulary loading and reusable tag/focus predicates.
 - A8: `scripts/enrich.py` resolves human input before validation; it must not redefine durable tag/focus rules.

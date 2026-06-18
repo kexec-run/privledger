@@ -7,7 +7,7 @@ For tag semantics, see [tags.md](./tags.md).
 
 ## Prompt Flow
 
-`scripts/enrich.py` loads an existing `vlog/TS.json`, prompts for mutable fields, validates the result, and writes through `metadata/writer.py`.
+`scripts/enrich.py` loads an existing `vlog/TS.json`, prompts for mutable fields, validates the result through `metadata/rewrite.py`, and writes atomically through `metadata/writer.py`.
 
 Current prompt order:
 

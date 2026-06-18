@@ -64,6 +64,7 @@ PYTHONPATH=. pytest tests/test_writer_invariants.py tests/test_enrich_behavior.p
 - [Operations](docs/operations.md) - setup, commands, recording, enrichment, verification
 - [Metadata](docs/metadata.md) - schema fields, writers, validation, stored-data invariants
 - [Enrichment](docs/enrichment.md) - prompt flow, typo resolution, focus-domain behavior
+- [Transcripts](docs/transcript.md) - batch transcript sidecars, metadata linking, translation artifacts
 - [Tags](docs/tags.md) - tag semantics, definitions, and usage rules
 - [Test Matrix](docs/test.md) - behavior matrix and failure cases
 - [Recording Guide](docs/questions.md) - what to say when you don't know what to say while recording

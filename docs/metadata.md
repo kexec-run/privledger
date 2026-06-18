@@ -58,7 +58,8 @@ Deferred fields:
 | semantic invariants | `metadata/check.py` | stored-data validation before schema validation |
 | custom schema loading | `metadata/custom_schema.py` | YAML field/type normalization and schema hash generation |
 | schema validation | `metadata/validator.py` | JSON schema enforcement |
-| persistence | `metadata/writer.py` | construction, validation order, atomic write |
+| persistence | `metadata/writer.py` | construction, validation order, atomic JSON write primitive |
+| constrained rewrites | `metadata/rewrite.py` | allowed-field updates over existing metadata |
 
 ## Stored-Data Invariants
 
@@ -108,6 +109,7 @@ Callers may handle failures differently:
 
 - `scripts/enrich.py` catches validation errors and re-prompts
 - `metadata/check.py` lets validation errors block writes
+- transcript linking preserves unrelated existing metadata and validates only transcript-owned fields
 
 Callers should not reimplement exact tag/focus rules locally.
 

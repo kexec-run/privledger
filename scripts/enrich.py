@@ -11,9 +11,8 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from metadata.check import check_invariants  # noqa: E402
+from metadata.rewrite import rewrite_existing_metadata_atomic  # noqa: E402
 from metadata.tags import load_tag_vocabulary, validate_focus_domain  # noqa: E402
-from metadata.writer import write_metadata_atomic  # noqa: E402
 
 ###############################################################################
 # Paths and environment
@@ -46,6 +45,22 @@ if not SCHEMA_PATH.exists():
 SCHEMA = json.loads(SCHEMA_PATH.read_text())
 
 _MISSING = object()
+
+ENRICH_ALLOWED_UPDATES = frozenset(
+    {
+        "mood",
+        "energy",
+        "stress",
+        "sleepiness",
+        "sleep_hours",
+        "caffeine_mg",
+        "body_weight",
+        "focus_domain",
+        "tags",
+        "location",
+        "custom",
+    }
+)
 
 ###############################################################################
 # Custom schema (optional)
@@ -140,7 +155,6 @@ def prompt_str(label: str, current):
     return raw
 
 
-
 def print_tag_grid(tags: list[str], *, columns: int = 4) -> None:
     """Print tags horizontally for quick scanning."""
     if not tags:
@@ -167,7 +181,9 @@ def tag_match_score(query: str, candidate: str) -> int:
         return int(SequenceMatcher(None, normalized, candidate).ratio() * 100)
 
 
-def tag_candidates(raw: str, vocabulary: list[str], *, min_score: int = 75) -> list[str]:
+def tag_candidates(
+    raw: str, vocabulary: list[str], *, min_score: int = 75
+) -> list[str]:
     """Return canonical tag candidates ordered by typo-match score."""
     query = raw.strip().lower()
     scored = [
@@ -400,20 +416,6 @@ def main():
     print(f"  Session: {ts}")
     print(f"{'─' * 40}\n")
 
-    # Immutable fields — passed through unchanged
-    IMMUTABLE = {
-        "id",
-        "timestamp_utc",
-        "timestamp_local",
-        "schema_version",
-        "pipeline_version",
-        "media_file",
-        "video_device",
-        "metadata_quality",
-        "transcript_file",
-        "custom",
-    }
-
     # Load custom schema if enabled
     fields = types = current_hash = None
     new_custom = _MISSING
@@ -476,49 +478,28 @@ def main():
 
     print()
 
-    # Strip any accidental immutable field overwrites before merge
-    for k in IMMUTABLE:
-        updates.pop(k, None)
-
-    # Merge: immutable fields from original, user fields from updates
-    merged = {**original, **updates}
     if new_custom is _MISSING:
-        merged.pop("custom", None)
+        updates.pop("custom", None)
     else:
-        merged["custom"] = new_custom
+        updates["custom"] = new_custom
 
-    # Validate invariants before write
     try:
-        check_invariants(merged, fields, types, current_hash)
+        rewrite_existing_metadata_atomic(
+            output_path=meta_path,
+            original=original,
+            updates=updates,
+            allowed_updates=ENRICH_ALLOWED_UPDATES,
+            schema_version=int(SCHEMA_VERSION),
+            pipeline_version=PIPELINE_VERSION,
+            schema=SCHEMA,
+            custom_fields=fields,
+            custom_types=types,
+            current_hash=current_hash,
+        )
+        print(f"[enrich] Metadata updated → {meta_path.name}")
     except ValueError as e:
         print(f"[enrich] ERROR: validation failed: {e}", file=sys.stderr)
         sys.exit(1)
-
-    try:
-        write_metadata_atomic(
-            output_path=meta_path,
-            entry_id=merged["id"],
-            timestamp_utc=merged["timestamp_utc"],
-            media_file=merged["media_file"],
-            metadata_quality=merged["metadata_quality"],
-            schema_version=int(SCHEMA_VERSION),
-            pipeline_version=PIPELINE_VERSION,
-            optional_fields={
-                k: v
-                for k, v in merged.items()
-                if k
-                not in {
-                    "id",
-                    "timestamp_utc",
-                    "schema_version",
-                    "pipeline_version",
-                    "metadata_quality",
-                    "media_file",
-                }
-            },
-            schema=SCHEMA,
-        )
-        print(f"[enrich] Metadata updated → {meta_path.name}")
     except Exception as e:
         print(f"[enrich] ERROR: write failed: {e}", file=sys.stderr)
         sys.exit(1)

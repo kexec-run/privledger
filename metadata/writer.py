@@ -7,6 +7,47 @@ from metadata.check import check_core_invariants
 from metadata.validator import validate_metadata
 
 
+def write_json_atomic(output_path: Path, payload_obj: dict) -> Path:
+    """Serialize a dict canonically and atomically replace output_path."""
+    payload = (
+        json.dumps(
+            payload_obj,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+        + "\n"
+    ).encode("utf-8")
+
+    output_path = Path(output_path)
+    parent = output_path.parent
+    parent.mkdir(parents=True, exist_ok=True)
+
+    fd, tmp_path = tempfile.mkstemp(dir=parent, suffix=f".tmp.{os.getpid()}")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(payload)
+            f.flush()
+            os.fsync(f.fileno())
+
+        dir_fd = os.open(str(parent), os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+
+        os.replace(tmp_path, output_path)
+
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+    return output_path
+
+
 def write_metadata_atomic(
     *,
     output_path: Path,
@@ -59,44 +100,4 @@ def write_metadata_atomic(
     # 2. Validate against schema — fail fast, nothing written if invalid
     validate_metadata(metadata, schema)
 
-    # 3. Canonical JSON serialization
-    payload = (
-        json.dumps(
-            metadata,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-        )
-        + "\n"
-    ).encode("utf-8")
-
-    # 4. Atomic write: temp → flush → fsync file → fsync dir → rename
-    output_path = Path(output_path)
-    parent = output_path.parent
-    parent.mkdir(parents=True, exist_ok=True)
-
-    fd, tmp_path = tempfile.mkstemp(dir=parent, suffix=f".tmp.{os.getpid()}")
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(payload)
-            f.flush()
-            os.fsync(f.fileno())
-
-        # fsync the directory
-        dir_fd = os.open(str(parent), os.O_RDONLY)
-        try:
-            os.fsync(dir_fd)
-        finally:
-            os.close(dir_fd)
-
-        os.replace(tmp_path, output_path)
-
-    except Exception:
-        # Clean up temp file on any failure
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
-
-    return output_path
+    return write_json_atomic(output_path, metadata)
