@@ -429,7 +429,7 @@ def main():
 
     try:
         updates = {}
-        print("Ratings")
+        print("Ratings:")
         updates["mood"] = prompt_int("Mood", original.get("mood"), 1, 5)
         updates["energy"] = prompt_int("Energy", original.get("energy"), 1, 5)
         updates["stress"] = prompt_int("Stress", original.get("stress"), 1, 5)
@@ -438,7 +438,7 @@ def main():
         )
 
         print()
-        print("Body")
+        print("Recovery / Intake:")
         updates["sleep_hours"] = prompt_float(
             "Sleep hours", original.get("sleep_hours")
         )
@@ -449,7 +449,7 @@ def main():
             "Body weight", original.get("body_weight")
         )
         print()
-        print("Tags")
+        print("Tags:")
         print("Available:")
         tag_vocabulary = load_tag_vocabulary()
         print_tag_grid(tag_vocabulary)

@@ -1,8 +1,16 @@
 import json
+from datetime import datetime, timezone
 
 import pytest
 
 import scripts.enrich as enrich
+import scripts.privledger as privledger
+
+
+class FixedDateTime:
+    @staticmethod
+    def now(tz=None):
+        return datetime(2026, 5, 24, 6, 30, tzinfo=timezone.utc).astimezone(tz)
 
 
 def base_metadata():
@@ -106,7 +114,9 @@ class TestEnrichmentContract:
         assert code is None
         assert updated["tags"] == ["fatigue", "programming"]
 
-    def test_tag_overflow_reprompts_and_leaves_tags_unchanged(self, monkeypatch, tmp_path):
+    def test_tag_overflow_reprompts_and_leaves_tags_unchanged(
+        self, monkeypatch, tmp_path
+    ):
         code, original, updated = run_enrich(
             monkeypatch,
             tmp_path,
@@ -129,6 +139,112 @@ class TestEnrichmentContract:
         assert updated["id"] == original["id"]
         assert updated["timestamp_utc"] == original["timestamp_utc"]
         assert updated["media_file"] == original["media_file"]
+        assert updated["focus_domain"] == "sleep"
+        assert updated["tags"] == ["fatigue"]
+        assert updated["location"] == "home"
+
+    def test_recording_pipeline_metadata_can_be_enriched(self, monkeypatch, tmp_path):
+        vlog_dir = tmp_path / "vlog"
+        scripts_dir = tmp_path / "scripts"
+        vlog_dir.mkdir()
+        scripts_dir.mkdir()
+        record_script = scripts_dir / "record-linux.sh"
+        record_script.write_text("#!/usr/bin/env bash\nexit 0\n")
+        config = privledger.RecorderConfig(
+            name="test-linux",
+            record_script=record_script,
+            good_suffix=".mkv",
+            bad_suffix=".mkv.bad.mkv",
+            required_env_vars=(
+                "VIDEO_DEV",
+                "AUDIO_SRC",
+                "VAAPI_DEV",
+                "SCHEMA_VERSION",
+                "PIPELINE_VERSION",
+            ),
+            video_device_env="VIDEO_DEV",
+        )
+
+        class FakePopen:
+            pid = 12345
+
+            def __init__(self, _cmd, env, start_new_session):
+                assert start_new_session is True
+                (vlog_dir / f"{env['TIMESTAMP']}.mkv").write_bytes(b"good media")
+
+            def wait(self):
+                return 0
+
+            def poll(self):
+                return 0
+
+        monkeypatch.setattr(privledger, "ROOT_DIR", tmp_path)
+        monkeypatch.setattr(
+            privledger,
+            "load_config_env",
+            lambda _config: (
+                {
+                    "VIDEO_DEV": "/dev/video-mock",
+                    "AUDIO_SRC": "mock-source",
+                    "VAAPI_DEV": "/dev/dri/mock",
+                    "SCHEMA_VERSION": "1",
+                    "PIPELINE_VERSION": "0.1.0",
+                },
+                "1",
+                "0.1.0",
+            ),
+        )
+        monkeypatch.setattr(privledger, "load_schema", lambda _config: {})
+        monkeypatch.setattr(privledger, "load_custom_schema", lambda: (False, None))
+        monkeypatch.setattr(privledger, "datetime", FixedDateTime)
+        monkeypatch.setattr(
+            privledger,
+            "detect_video_device_name",
+            lambda _config, _env: "mock camera",
+        )
+        monkeypatch.setattr(privledger.signal, "signal", lambda *_args, **_kwargs: None)
+        monkeypatch.setattr(privledger.subprocess, "Popen", FakePopen)
+
+        with pytest.raises(SystemExit) as capture_exit:
+            privledger.supervise_capture(config)
+
+        assert capture_exit.value.code == 0
+        meta_path = vlog_dir / "2026-05-24-0630.json"
+        captured = json.loads(meta_path.read_text())
+
+        inputs = iter(
+            ["4", "3", "2", "1", "7.5", "120", "72", "sleep", "fatigue", "home"]
+        )
+        monkeypatch.setattr(enrich, "VLOG_DIR", vlog_dir)
+        monkeypatch.setattr(enrich, "CUSTOM_ENABLED", False)
+        monkeypatch.setattr(enrich, "SCHEMA_VERSION", "1")
+        monkeypatch.setattr(enrich, "PIPELINE_VERSION", "0.1.0")
+        monkeypatch.setattr(enrich.sys, "argv", ["enrich.py", "2026-05-24-0630"])
+        monkeypatch.setattr(enrich, "_readline", lambda _prompt: next(inputs))
+        monkeypatch.setattr(enrich, "resolve_custom", lambda *_args: enrich._MISSING)
+
+        enrich.main()
+
+        updated = json.loads(meta_path.read_text())
+        for field in (
+            "id",
+            "timestamp_utc",
+            "timestamp_local",
+            "schema_version",
+            "pipeline_version",
+            "metadata_quality",
+            "media_file",
+            "video_device",
+            "transcript_file",
+        ):
+            assert updated[field] == captured[field]
+        assert updated["mood"] == 4
+        assert updated["energy"] == 3
+        assert updated["stress"] == 2
+        assert updated["sleepiness"] == 1
+        assert updated["sleep_hours"] == 7.5
+        assert updated["caffeine_mg"] == 120
+        assert updated["body_weight"] == 72
         assert updated["focus_domain"] == "sleep"
         assert updated["tags"] == ["fatigue"]
         assert updated["location"] == "home"
