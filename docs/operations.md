@@ -45,7 +45,7 @@ Run lint:
 uv run ruff check .
 ```
 
-Run type checking:
+Run type checking when `basedpyright` is installed:
 
 ```bash
 uv run basedpyright
@@ -82,7 +82,6 @@ Sandboxed automation can report `Camera access is denied` even when the same com
 For Python changes, run:
 
 ```bash
-uv run basedpyright
 uv run ruff check .
 ```
 
@@ -91,5 +90,5 @@ Then run the narrowest relevant tests.
 Known current status:
 
 - focused writer/enrichment tests pass
-- broader supervisor behavior includes a documented deviation for `.bad.mkv` with recorder exit `0`
-- `basedpyright` currently fails globally due existing import/type backlog
+- supervisor behavior tests pass
+- `basedpyright` is optional and is not part of the required verification gate

@@ -14,9 +14,7 @@ README is the entrypoint. Detailed contracts live under `docs/`.
 
 ## Status
 
-Capture pipeline exists. Metadata writes are schema-validated and atomic. Enrichment CLI is functional. Tag/focus invariants are encoded in tests. Active development is focused on hardening capture classification and enrichment workflow.
-
-Known current deviation: the supervisor behavior matrix has one failing case where a `.bad.mkv` artifact with recorder exit `0` still returns success.
+Capture pipeline exists. Metadata writes are schema-validated and atomic. Enrichment CLI is functional. Tag/focus invariants and supervisor behavior are encoded in tests.
 
 ## Quick Start
 
@@ -184,7 +182,7 @@ cat vlog/TS.json | jq .
 ### Playback
 
 ```bash
-mpv vlog/TS.mkv
+mpv vlog/TS.mov  # or vlog/TS.mkv on Linux
 ```
 
 ## Verification
@@ -207,7 +205,7 @@ Run lint:
 uv run ruff check .
 ```
 
-`basedpyright` is currently noisy and not a useful required gate for this phase.
+`basedpyright` is optional and is not part of the required verification gate.
 
 ## Invariant Summary
 

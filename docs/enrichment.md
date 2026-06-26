@@ -12,7 +12,7 @@ For tag semantics, see [tags.md](./tags.md).
 Current prompt order:
 
 1. ratings
-2. body fields
+2. recovery / intake fields
 3. tag vocabulary display
 4. focus domain
 5. regular tags

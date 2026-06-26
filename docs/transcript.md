@@ -105,7 +105,7 @@ Already-linked sidecars are schema-validated before they are skipped. Both linke
 
 ```bash
 PYTHONPATH=. python3 scripts/transcript_batch.py transcribe \
-  --vlog-dir /Volumes/groot/dev/privledger/vlog \
+  --vlog-dir /path/to/vlog \
   --apply
 ```
 
@@ -124,7 +124,7 @@ Run it with:
 
 ```bash
 PYTHONPATH=. python3 scripts/transcript_batch.py translate \
-  --vlog-dir /Volumes/groot/dev/privledger/vlog \
+  --vlog-dir /path/to/vlog \
   --apply
 ```
 
