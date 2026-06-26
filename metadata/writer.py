@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 from metadata.check import check_core_invariants
-from metadata.validator import validate_metadata
+from schema_validation import validate_document
 
 
 def write_json_atomic(output_path: Path, payload_obj: dict) -> Path:
@@ -98,6 +98,6 @@ def write_metadata_atomic(
     check_core_invariants(metadata)
 
     # 2. Validate against schema — fail fast, nothing written if invalid
-    validate_metadata(metadata, schema)
+    validate_document(metadata, schema)
 
     return write_json_atomic(output_path, metadata)

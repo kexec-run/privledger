@@ -25,7 +25,7 @@ The full transcript is not embedded in metadata JSON.
 
 ## Source Transcription
 
-`scripts/transcribe_batch.py` scans `vlog/` for good `.mkv` and `.mov` media files.
+`scripts/transcript_batch.py transcribe` scans `vlog/` for good `.mkv` and `.mov` media files.
 
 It skips:
 
@@ -50,7 +50,7 @@ The Whisper command uses source transcription, not direct translation:
 whisper-cli -ng -t 10 -mc 0 -nf -l auto -oj
 ```
 
-Direct Whisper translation with `-tr` is intentionally not used because it makes recognition and translation errors hard to separate.
+Source transcription does not use `-tr`; English translation is an explicit second mode.
 
 ## Transcript Validation
 
@@ -62,6 +62,9 @@ Before a transcript sidecar is promoted, the batch script checks:
 - each segment has positive duration
 - segment offsets do not overlap
 - final transcript timestamp is close to media duration
+- payload shape satisfies `schemas/transcript.v1.schema.json`
+- metadata `id` matches the media stem
+- metadata `media_file` matches the exact media filename
 
 Invalid transcript sidecars are not linked into metadata.
 
@@ -92,47 +95,50 @@ The transcript linker intentionally does not revalidate unrelated pre-existing m
 
 This allows old records with vocabulary drift to receive transcript links without forcing tag cleanup in the same batch operation.
 
+The relational identity checks happen before linking. They do not mutate or normalize pre-existing metadata.
+
 ## Existing Sidecars
 
 If a source transcript sidecar already exists and `TS.json.transcript_file` is still `null`, rerunning transcription with `--apply` validates and links the existing sidecar instead of rerunning Whisper.
 
+Already-linked sidecars are schema-validated before they are skipped. Both linked and unlinked existing sidecars are checked against media duration before a link is accepted.
+
 ```bash
-PYTHONPATH=. python3 scripts/transcribe_batch.py \
+PYTHONPATH=. python3 scripts/transcript_batch.py transcribe \
   --vlog-dir /Volumes/groot/dev/privledger/vlog \
   --apply
 ```
 
 ## Translation
 
-Translation is a separate batch stage:
+Translation is a separate mode in the same batch command:
 
 ```text
-source transcript JSON
--> external translator command
--> English translated transcript JSON
+media file + validated source transcript
+-> temporary 16 kHz mono WAV
+-> whisper-cli -tr English JSON
+-> validated translated transcript sidecar
 ```
 
-`scripts/translate_batch.py` reads source transcript sidecars and writes translated sidecars:
+Run it with:
+
+```bash
+PYTHONPATH=. python3 scripts/transcript_batch.py translate \
+  --vlog-dir /Volumes/groot/dev/privledger/vlog \
+  --apply
+```
+
+The output is:
 
 ```text
 vlog/transcripts/TS.whisper-large-v3-translate-en.json
 ```
 
-Translated segments preserve source `timestamps` and `offsets`, replace `text` with translated text, and store the original segment text as `source_text`.
+Whisper translation may use segment boundaries that differ from source transcription. Translated segments keep Whisper's translated timestamps and offsets, while `source_text` contains source segments whose time ranges overlap the translated segment.
 
 Translation does not update `TS.json`.
 
-The translator command must read JSON from stdin:
-
-```json
-{"target_language":"en","texts":["..."]}
-```
-
-and write JSON to stdout:
-
-```json
-{"texts":["translated ..."]}
-```
+Each translated sidecar stores `translation.source_sha256`, the SHA-256 hash of the exact source transcript bytes. Existing translations with a missing or mismatched hash are reported as `stale_existing`.
 
 ## Validation Boundary
 
@@ -142,3 +148,6 @@ There are two metadata write paths:
 - transcript link patches: validate only transcript-owned fields and preserve unrelated existing metadata
 
 Both paths use the atomic JSON write primitive in `metadata/writer.py`.
+
+
+Source and translated sidecars are published through the same atomic JSON writer. `transcript.v1.schema.json` and `translation.v1.schema.json` validate individual sidecar structure; Python checks cross-segment timing and relationships among media, metadata, source transcripts, and translations.

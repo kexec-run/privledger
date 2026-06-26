@@ -19,7 +19,7 @@ from metadata.tags import load_tag_vocabulary, validate_focus_domain  # noqa: E4
 ###############################################################################
 
 CONFIG_ENV = ROOT_DIR / "config" / "env"
-SCHEMA_PATH = ROOT_DIR / "tests" / "schema" / "metadata.v1.schema.json"
+SCHEMA_PATH = ROOT_DIR / "schemas" / "metadata.v1.schema.json"
 VLOG_DIR = ROOT_DIR / "vlog"
 
 if not CONFIG_ENV.exists():

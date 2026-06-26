@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Final
 
 from metadata.check import check_core_invariants, check_invariants
-from metadata.validator import validate_metadata
+from schema_validation import validate_document
 from metadata.writer import write_json_atomic, write_metadata_atomic
 
 
@@ -85,7 +85,7 @@ def validate_existing_metadata_update(
     merged = {**original, **updates}
 
     check_core_invariants(merged)
-    validate_metadata(merged, schema)
+    validate_document(merged, schema)
 
     if custom_fields is not _SKIP_CUSTOM_INVARIANTS:
         check_invariants(merged, custom_fields, custom_types, current_hash)

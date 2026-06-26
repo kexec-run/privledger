@@ -16,7 +16,7 @@ Source: `docs/arch.md` failure matrix and `docs/operations.md` macOS mock constr
 
 ## Metadata / Schema
 
-Source: `docs/metadata.md` and `tests/schema/metadata.v1.schema.json`.
+Source: `docs/metadata.md` and `schemas/metadata.v1.schema.json`.
 
 | Invariant | Success case | Failure case | Expected assertion |
 |---|---|---|---|

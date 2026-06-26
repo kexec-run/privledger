@@ -11,7 +11,7 @@ For prompt behavior and typo handling, see [enrichment.md](./enrichment.md).
 capture classification
 -> metadata/writer.py
 -> metadata/check.py
--> metadata/validator.py
+-> schema_validation.py
 -> atomic JSON write
 ```
 
@@ -57,7 +57,7 @@ Deferred fields:
 | tag/focus predicates | `metadata/tags.py` | vocabulary loading, regular tag checks, focus-domain checks |
 | semantic invariants | `metadata/check.py` | stored-data validation before schema validation |
 | custom schema loading | `metadata/custom_schema.py` | YAML field/type normalization and schema hash generation |
-| schema validation | `metadata/validator.py` | JSON schema enforcement |
+| schema validation | `schema_validation.py` | JSON schema enforcement for metadata and sidecars |
 | persistence | `metadata/writer.py` | construction, validation order, atomic JSON write primitive |
 | constrained rewrites | `metadata/rewrite.py` | allowed-field updates over existing metadata |
 

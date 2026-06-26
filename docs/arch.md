@@ -33,9 +33,9 @@ Each layer owns one class of responsibility. Cross-layer leakage should be treat
 | `metadata/check.py` | strict stored-data invariants | fuzzy typo correction |
 | `metadata/tags.py` | exact tag vocabulary loading and tag/focus predicates | prompt UI |
 | `metadata/custom_schema.py` | custom metadata schema loading and type normalization | prompt rendering or persistence |
-| `metadata/validator.py` | JSON schema validation wrapper | semantic invariant definitions |
+| `schema_validation.py` | JSON schema validation wrapper | semantic invariant definitions |
 | `scripts/enrich.py` | user input, typo resolution, re-prompt behavior | durable invariant definitions |
-| `tests/schema/` | JSON schema contract fixtures | runtime schema mutation |
+| `schemas/` | runtime JSON schema contracts | production behavior or schema-specific code |
 | `tests/` | behavior verification and mock capture cases | changing production behavior |
 
 ## Data Flow
@@ -79,7 +79,7 @@ vlog/TS.json
 Optional transcription:
 
 ```text
-scripts/transcribe_batch.py  # media artifact → source transcript sidecar
+scripts/transcript_batch.py transcribe  # media artifact -> source transcript sidecar
 ↓
 metadata/rewrite.py          # patch transcript_file + metadata_quality only
 ↓
@@ -101,7 +101,8 @@ vlog/TS.json
 | `writer.py` | metadata fields | `.json` | validate + persist |
 | `rewrite.py` | existing `.json` + allowed updates | updated `.json` | constrain rewrite surface |
 | `enrich.py` | existing `.json` | updated `.json` | user-driven enrichment |
-| `transcribe_batch.py` | good media artifact + metadata | transcript sidecar + metadata link | source-language transcription |
+| `transcript_batch.py transcribe` | good media artifact + metadata | source transcript sidecar + metadata link | source-language transcription |
+| `transcript_batch.py translate` | good media artifact + source transcript | English translated sidecar | Whisper speech translation |
 
 ## Artifact Model
 
@@ -160,16 +161,21 @@ Generated artifacts and local data volume details are omitted.
 │   ├── operations.md
 │   ├── questions.md
 │   ├── tags.md
-│   └── test.md
+│   ├── test.md
+│   └── transcript.md
 ├── logs/ - disposable capture logs
 │   └── .gitkeep
-├── metadata/ - validation and persistence layer
+├── metadata/ - metadata invariants, rewrite policy, and persistence
 │   ├── __init__.py
 │   ├── check.py
 │   ├── custom_schema.py
+│   ├── rewrite.py
 │   ├── tags.py
-│   ├── validator.py
 │   └── writer.py
+├── schemas/ - runtime JSON schema contracts
+│   ├── metadata.v1.schema.json
+│   ├── transcript.v1.schema.json
+│   └── translation.v1.schema.json
 ├── scripts/ - command entrypoints and orchestration
 │   ├── enrich.py
 │   ├── privledger.py
@@ -177,13 +183,14 @@ Generated artifacts and local data volume details are omitted.
 │   ├── privledger-mac.py
 │   ├── record-linux.sh
 │   ├── record-mac.sh
-│   └── test_writer.py
+│   └── transcript_batch.py
 ├── tests/ - behavior and schema verification
-│   ├── schema/
-│   │   └── metadata.v1.schema.json
 │   ├── test_check.py
 │   ├── test_enrich_behavior.py
+│   ├── test_metadata_rewrite.py
 │   ├── test_supervisor_behavior.py
+│   ├── test_transcript_batch.py
+│   ├── test_transcript_schema.py
 │   └── test_writer_invariants.py
 ├── vlog/ - durable media and metadata store
 │   ├── .gitkeep
@@ -192,6 +199,7 @@ Generated artifacts and local data volume details are omitted.
 ├── AGENTS.md
 ├── README.md
 ├── requirements.txt
+├── schema_validation.py
 └── TODO.md
 ```
 

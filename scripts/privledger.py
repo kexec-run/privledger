@@ -19,7 +19,7 @@ from metadata.check import check_invariants  # noqa: E402
 from metadata.writer import write_metadata_atomic  # noqa: E402
 
 CONFIG_ENV = ROOT_DIR / "config" / "env"
-SCHEMA_PATH = ROOT_DIR / "tests" / "schema" / "metadata.v1.schema.json"
+SCHEMA_PATH = ROOT_DIR / "schemas" / "metadata.v1.schema.json"
 CUSTOM_SCHEMA_PATH = ROOT_DIR / "config" / "custom_schema.yaml"
 
 proc: subprocess.Popen | None = None
