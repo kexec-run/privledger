@@ -309,6 +309,102 @@ class TestEnrichmentContract:
         assert exc.value.code == 0
         assert json.loads(meta_path.read_text()) == original
 
+    def test_direct_json_enrichment_updates_metadata(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        vlog_dir = tmp_path / "vlog"
+        vlog_dir.mkdir()
+        meta_path = vlog_dir / "2026-05-24-0630.json"
+        write_metadata(meta_path, {"tags": ["programming"]})
+
+        monkeypatch.setattr(enrich, "VLOG_DIR", vlog_dir)
+        monkeypatch.setattr(enrich, "CUSTOM_ENABLED", False)
+        monkeypatch.setattr(
+            enrich.sys, "argv", ["enrich.py", "--json", "2026-05-24-0630"]
+        )
+        monkeypatch.setattr(
+            enrich.sys,
+            "stdin",
+            type(
+                "Input",
+                (),
+                {
+                    "read": lambda _self: "",
+                },
+            )(),
+        )
+        monkeypatch.setattr(
+            enrich.json,
+            "load",
+            lambda _stdin: {"mood": 5, "tags": ["sleep"], "location": "desk"},
+        )
+
+        enrich.main()
+
+        updated = json.loads(meta_path.read_text())
+        result = json.loads(capsys.readouterr().out)
+        assert result["ok"] is True
+        assert result["id"] == "2026-05-24-0630"
+        assert result["metadata"] == updated
+        assert result["changed"] == ["location", "mood", "tags"]
+        assert updated["mood"] == 5
+        assert updated["tags"] == ["sleep"]
+        assert updated["location"] == "desk"
+
+    def test_direct_json_validation_error_is_structured(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        vlog_dir = tmp_path / "vlog"
+        vlog_dir.mkdir()
+        meta_path = vlog_dir / "2026-05-24-0630.json"
+        original = write_metadata(meta_path, {"tags": ["programming"]})
+
+        monkeypatch.setattr(enrich, "VLOG_DIR", vlog_dir)
+        monkeypatch.setattr(enrich, "CUSTOM_ENABLED", False)
+        monkeypatch.setattr(
+            enrich.sys, "argv", ["enrich.py", "--json", "2026-05-24-0630"]
+        )
+        monkeypatch.setattr(
+            enrich.json,
+            "load",
+            lambda _stdin: {"mood": 99},
+        )
+
+        with pytest.raises(SystemExit) as exc:
+            enrich.main()
+
+        assert exc.value.code == 1
+        assert json.loads(meta_path.read_text()) == original
+        error = json.loads(capsys.readouterr().out)
+        assert error["ok"] is False
+        assert error["id"] == "2026-05-24-0630"
+        assert error["metadata"] == original
+        assert error["changed"] == []
+        assert "mood" in error["field_errors"]
+        assert "greater than the maximum" in error["field_errors"]["mood"]
+
+    def test_describe_enrichment_returns_tag_and_custom_shape(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        vlog_dir = tmp_path / "vlog"
+        vlog_dir.mkdir()
+        meta_path = vlog_dir / "2026-05-24-0630.json"
+        write_metadata(meta_path, {"tags": ["programming"]})
+
+        monkeypatch.setattr(enrich, "VLOG_DIR", vlog_dir)
+        monkeypatch.setattr(enrich, "CUSTOM_ENABLED", False)
+        monkeypatch.setattr(enrich, "load_tag_vocabulary", lambda: ["programming"])
+        monkeypatch.setattr(
+            enrich.sys, "argv", ["enrich.py", "--describe", "2026-05-24-0630"]
+        )
+
+        enrich.main()
+        described = json.loads(capsys.readouterr().out)
+        assert described["id"] == "2026-05-24-0630"
+        assert described["values"]["tags"] == ["programming"]
+        assert described["tag_vocabulary"] == ["programming"]
+        assert described["custom"]["enabled"] is False
+
     def test_typo_tag_query_resolves_to_single_candidate(self, monkeypatch, tmp_path):
         code, _original, updated = run_enrich(
             monkeypatch,

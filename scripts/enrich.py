@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
+from jsonschema import ValidationError
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
@@ -392,6 +393,216 @@ def resolve_custom(original, fields, types, current_hash):
     return build_custom(fields, types, current_hash)
 
 
+def custom_type_name(typ) -> str:
+    if typ is int:
+        return "integer"
+    if typ == (int, float):
+        return "number"
+    if typ is bool:
+        return "boolean"
+    if typ is str:
+        return "string"
+    return "unknown"
+
+
+def load_custom_config():
+    if not CUSTOM_ENABLED:
+        return None, None, None
+    try:
+        from metadata.custom_schema import load_custom_schema
+
+        return load_custom_schema(CUSTOM_SCHEMA_PATH)
+    except FileNotFoundError:
+        return None, None, None
+
+
+def describe_enrichment(ts: str, original: dict) -> dict:
+    fields, types, current_hash = load_custom_config()
+    custom_data = {}
+    if isinstance(original.get("custom"), dict):
+        custom_data = original["custom"].get("data") or {}
+
+    return {
+        "id": ts,
+        "values": {
+            "mood": original.get("mood"),
+            "energy": original.get("energy"),
+            "stress": original.get("stress"),
+            "sleepiness": original.get("sleepiness"),
+            "sleep_hours": original.get("sleep_hours"),
+            "caffeine_mg": original.get("caffeine_mg"),
+            "body_weight": original.get("body_weight"),
+            "focus_domain": original.get("focus_domain"),
+            "tags": original.get("tags") or [],
+            "location": original.get("location"),
+        },
+        "tag_vocabulary": load_tag_vocabulary(),
+        "custom": {
+            "enabled": fields is not None,
+            "schema_hash": current_hash,
+            "fields": [
+                {
+                    "name": field,
+                    "type": custom_type_name(types[field]),
+                    "value": custom_data.get(field),
+                }
+                for field in (fields or [])
+            ],
+        },
+    }
+
+
+def coerce_direct_custom(original: dict, submitted, fields, current_hash):
+    if fields is None:
+        return _MISSING
+    if submitted is None:
+        return original.get("custom", None)
+    if not isinstance(submitted, dict):
+        raise ValueError("custom must be an object")
+
+    current_data = {}
+    if isinstance(original.get("custom"), dict):
+        current_data = original["custom"].get("data") or {}
+
+    data = {}
+    for field in fields:
+        data[field] = (
+            submitted[field] if field in submitted else current_data.get(field)
+        )
+    return {"schema_hash": current_hash, "data": data}
+
+
+def apply_updates(
+    meta_path: Path, original: dict, updates: dict, fields, types, current_hash
+):
+    rewrite_existing_metadata_atomic(
+        output_path=meta_path,
+        original=original,
+        updates=updates,
+        allowed_updates=ENRICH_ALLOWED_UPDATES,
+        schema_version=int(SCHEMA_VERSION),
+        pipeline_version=PIPELINE_VERSION,
+        schema=SCHEMA,
+        custom_fields=fields,
+        custom_types=types,
+        current_hash=current_hash,
+    )
+
+
+def validation_field(message: str) -> str | None:
+    lower = message.lower()
+    field_names = [
+        "mood",
+        "energy",
+        "stress",
+        "sleepiness",
+        "sleep_hours",
+        "caffeine_mg",
+        "body_weight",
+        "focus_domain",
+        "tags",
+        "location",
+        "custom",
+    ]
+    for field in field_names:
+        if field in lower:
+            return field
+    if "tag" in lower:
+        return "tags"
+    if "schema_hash" in lower:
+        return "custom"
+    return None
+
+
+def validation_error_field(error: ValidationError) -> str | None:
+    path = list(error.path)
+    if path:
+        first = path[0]
+        if isinstance(first, str):
+            return "custom" if first == "custom" else first
+    return validation_field(str(error))
+
+
+def enrichment_json_response(
+    *,
+    ok: bool,
+    ts: str,
+    metadata: dict,
+    changed: list[str] | None = None,
+    field_errors: dict[str, str] | None = None,
+    message: str | None = None,
+) -> dict:
+    return {
+        "ok": ok,
+        "id": ts,
+        "metadata": metadata,
+        "changed": changed or [],
+        "field_errors": field_errors or {},
+        "message": message,
+    }
+
+
+def validation_response(
+    ts: str, metadata: dict, message: str, field: str | None
+) -> dict:
+    field_errors = {field: message} if field else {}
+    return enrichment_json_response(
+        ok=False,
+        ts=ts,
+        metadata=metadata,
+        field_errors=field_errors,
+        message=message,
+    )
+
+
+def changed_fields(original: dict, updated: dict, updates: dict) -> list[str]:
+    return sorted(key for key in updates if original.get(key) != updated.get(key))
+
+
+def print_validation_error(error: ValueError) -> None:
+    message = str(error)
+    print(
+        json.dumps(
+            {
+                "error": "validation_failed",
+                "message": message,
+                "field": validation_field(message),
+            }
+        ),
+        file=sys.stderr,
+    )
+
+
+def run_direct_json(ts: str, meta_path: Path, original: dict):
+    fields, types, current_hash = load_custom_config()
+    payload = json.load(sys.stdin)
+    if not isinstance(payload, dict):
+        raise ValueError("JSON payload must be an object")
+
+    updates = {
+        key: payload[key]
+        for key in ENRICH_ALLOWED_UPDATES
+        if key in payload and key != "custom"
+    }
+    if "custom" in payload:
+        custom = coerce_direct_custom(original, payload["custom"], fields, current_hash)
+        if custom is not _MISSING:
+            updates["custom"] = custom
+
+    apply_updates(meta_path, original, updates, fields, types, current_hash)
+    updated = load_metadata(meta_path)
+    print(
+        json.dumps(
+            enrichment_json_response(
+                ok=True,
+                ts=ts,
+                metadata=updated,
+                changed=changed_fields(original, updated, updates),
+            )
+        )
+    )
+
+
 ###############################################################################
 # Main
 ###############################################################################
@@ -399,10 +610,25 @@ def resolve_custom(original, fields, types, current_hash):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: enrich.py <vlog/TS.mkv | vlog/TS.json | TS>", file=sys.stderr)
+        print(
+            "Usage: enrich.py [--describe|--json] <vlog/TS.mkv | vlog/TS.json | TS>",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
-    ts = resolve_timestamp(sys.argv[1])
+    mode = "interactive"
+    args = sys.argv[1:]
+    if args[0] in ("--describe", "--json"):
+        mode = args[0][2:]
+        args = args[1:]
+    if not args:
+        print(
+            "Usage: enrich.py [--describe|--json] <vlog/TS.mkv | vlog/TS.json | TS>",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    ts = resolve_timestamp(args[0])
     meta_path = resolve_metadata_path(ts)
 
     if not meta_path.exists():
@@ -411,21 +637,56 @@ def main():
 
     original = load_metadata(meta_path)
 
+    if mode == "describe":
+        print(json.dumps(describe_enrichment(ts, original)))
+        return
+
+    if mode == "json":
+        try:
+            run_direct_json(ts, meta_path, original)
+            return
+        except ValueError as e:
+            message = str(e)
+            print(
+                json.dumps(
+                    validation_response(
+                        ts, original, message, validation_field(message)
+                    )
+                )
+            )
+            sys.exit(1)
+        except ValidationError as e:
+            message = e.message
+            print(
+                json.dumps(
+                    validation_response(
+                        ts, original, message, validation_error_field(e)
+                    )
+                )
+            )
+            sys.exit(1)
+        except Exception as e:
+            message = f"write failed: {e}"
+            print(
+                json.dumps(
+                    enrichment_json_response(
+                        ok=False,
+                        ts=ts,
+                        metadata=original,
+                        message=message,
+                    )
+                )
+            )
+            sys.exit(1)
+
     print(f"\n{'─' * 40}")
     print("  Enrich Metadata")
     print(f"  Session: {ts}")
     print(f"{'─' * 40}\n")
 
     # Load custom schema if enabled
-    fields = types = current_hash = None
+    fields, types, current_hash = load_custom_config()
     new_custom = _MISSING
-    if CUSTOM_ENABLED:
-        try:
-            from metadata.custom_schema import load_custom_schema
-
-            fields, types, current_hash = load_custom_schema(CUSTOM_SCHEMA_PATH)
-        except FileNotFoundError:
-            pass  # YAML missing — skip custom processing
 
     try:
         updates = {}
@@ -484,18 +745,7 @@ def main():
         updates["custom"] = new_custom
 
     try:
-        rewrite_existing_metadata_atomic(
-            output_path=meta_path,
-            original=original,
-            updates=updates,
-            allowed_updates=ENRICH_ALLOWED_UPDATES,
-            schema_version=int(SCHEMA_VERSION),
-            pipeline_version=PIPELINE_VERSION,
-            schema=SCHEMA,
-            custom_fields=fields,
-            custom_types=types,
-            current_hash=current_hash,
-        )
+        apply_updates(meta_path, original, updates, fields, types, current_hash)
         print(f"[enrich] Metadata updated → {meta_path.name}")
     except ValueError as e:
         print(f"[enrich] ERROR: validation failed: {e}", file=sys.stderr)

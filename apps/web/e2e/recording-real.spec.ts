@@ -1,0 +1,27 @@
+import { expect, test } from "@playwright/test";
+import { ensureRecorderIdle, getRecordings, recorderState } from "./helpers";
+
+test.beforeEach(async ({ request }) => {
+  await ensureRecorderIdle(request);
+});
+
+test("@real-recorder real Python recorder starts and stops from the UI", async ({ page, request }) => {
+  const before = await getRecordings(request, { limit: "1" });
+
+  await page.goto("/");
+  await page.getByTestId("record-button").click();
+  await expect(page.getByRole("heading", { name: "Prepare recording" })).toBeVisible();
+
+  await page.getByTestId("start-recording-button").click();
+  await expect.poll(() => recorderState(request), { timeout: 20_000 }).toBe("recording");
+  await expect(page.getByTestId("session-dialog").getByRole("heading", { name: "Recording" })).toBeVisible();
+
+  await page.waitForTimeout(3_000);
+  await page.getByTestId("stop-recording-button").click();
+  await expect(page.getByTestId("session-enrichment")).toBeVisible({ timeout: 60_000 });
+  await expect.poll(() => recorderState(request), { timeout: 20_000 }).toBe("idle");
+
+  const after = await getRecordings(request, { limit: "1" });
+  expect(after[0]?.id).toBeTruthy();
+  expect(after[0]?.id).not.toEqual(before[0]?.id);
+});

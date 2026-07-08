@@ -32,9 +32,20 @@ AGENTS.md
 __pycache__/
 *.pyc
 
+# Node / local API
+node_modules/
+dist/
+coverage/
+.privledger/
+
 # OS noise
 .DS_Store
 Thumbs.db
 
 # Kilo
 .kilo/
+
+# UI test artifacts
+.playwright-cli/
+output/
+apps/web/test-results/
