@@ -7,8 +7,9 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test:e2e": "playwright test --grep-invert @real-recorder",
-    "test:e2e:real": "PRIVLEDGER_E2E_REAL_RECORDER=1 playwright test e2e/recording-real.spec.ts"
+    "test:e2e:launcher": "node --test tests/run-e2e.test.mjs",
+    "test:e2e": "node e2e/run-e2e.mjs fake",
+    "test:e2e:real": "node e2e/run-e2e.mjs real"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",

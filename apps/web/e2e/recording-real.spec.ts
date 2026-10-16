@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { ensureRecorderIdle, getRecordings, recorderState } from "./helpers";
+import { ensureRecorderIdle, getRecordings, inspectMedia, recorderState, repoRoot } from "./helpers";
 
 test.beforeEach(async ({ request }) => {
+  await ensureRecorderIdle(request);
+});
+
+test.afterEach(async ({ request }) => {
   await ensureRecorderIdle(request);
 });
 
@@ -24,6 +28,12 @@ test("@real-recorder real Python recorder starts and stops from the UI", async (
   const after = await getRecordings(request, { limit: "1" });
   expect(after[0]?.id).toBeTruthy();
   expect(after[0]?.id).not.toEqual(before[0]?.id);
+  expect(after[0]?.media.file).toBeTruthy();
+  const mediaPath = `${repoRoot}/vlog/${after[0].media.file}`;
+  const media = inspectMedia(mediaPath);
+  expect(media.durationSeconds).toBeGreaterThan(0);
+  expect(media.codecs.length).toBeGreaterThan(0);
+  console.log(`Real media: ${media.durationSeconds.toFixed(2)}s (${media.codecs.join(", ")})`);
 
   await page.getByLabel("Close session dialog").click();
   const latestCard = page.locator(`[data-recording-id="${after[0].id}"]`);

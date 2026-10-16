@@ -1,8 +1,16 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-export const repoRoot = path.resolve(process.cwd(), "../..");
+const e2eRoot = process.env.PRIVLEDGER_E2E_ROOT;
+if (!e2eRoot || !path.isAbsolute(e2eRoot)) {
+  throw new Error(
+    "PRIVLEDGER_E2E_ROOT is required. Run browser tests with npm run test:e2e so the isolated workspace is prepared.",
+  );
+}
+
+export const repoRoot = path.resolve(e2eRoot);
 export const vlogDir = path.join(repoRoot, "vlog");
 
 export async function setFixtureDate(page: Page) {
@@ -17,6 +25,9 @@ type RecordingSummary = {
   };
   life: {
     tags: string[];
+  };
+  media: {
+    file: string | null;
   };
 };
 
@@ -77,6 +88,22 @@ export async function ensureRecorderIdle(request: APIRequestContext) {
     await request.post("/api/recordings/stop");
     await expect.poll(() => recorderState(request), { timeout: 20_000 }).toBe("idle");
   }
+}
+
+export function inspectMedia(file: string) {
+  const output = execFileSync(
+    "ffprobe",
+    ["-v", "error", "-show_entries", "format=duration", "-show_entries", "stream=codec_name", "-of", "json", file],
+    { encoding: "utf8" },
+  );
+  const result = JSON.parse(output) as {
+    format?: { duration?: string };
+    streams?: Array<{ codec_name?: string }>;
+  };
+  return {
+    durationSeconds: Number(result.format?.duration ?? 0),
+    codecs: (result.streams ?? []).map((stream) => stream.codec_name).filter(Boolean),
+  };
 }
 
 export async function getRecordings(

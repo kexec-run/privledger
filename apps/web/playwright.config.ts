@@ -4,19 +4,15 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
+const e2eRoot = process.env.PRIVLEDGER_E2E_ROOT;
+if (!e2eRoot || !path.isAbsolute(e2eRoot)) {
+  throw new Error("Run Playwright through npm run test:e2e to prepare an isolated data root.");
+}
 const apiPort = Number(process.env.PRIVLEDGER_E2E_API_PORT ?? "4578");
 const webPort = Number(process.env.PRIVLEDGER_E2E_WEB_PORT ?? "5174");
 const apiBaseUrl = `http://127.0.0.1:${apiPort}`;
 const webBaseUrl = `http://127.0.0.1:${webPort}`;
-const useRealRecorder = process.env.PRIVLEDGER_E2E_REAL_RECORDER === "1";
-const fakeRecorder = path.join(here, "e2e", "fixtures", "fake-recorder.mjs");
-
-const apiCommand = [
-  `PRIVLEDGER_API_PORT=${apiPort}`,
-  `PRIVLEDGER_ROOT=${repoRoot}`,
-  useRealRecorder ? "" : `PRIVLEDGER_RECORD_COMMAND="${process.execPath} ${fakeRecorder}"`,
-  "npm run dev",
-].filter(Boolean).join(" ");
+const apiCommand = `PRIVLEDGER_API_PORT=${apiPort} npm run dev`;
 
 export default defineConfig({
   testDir: "./e2e",

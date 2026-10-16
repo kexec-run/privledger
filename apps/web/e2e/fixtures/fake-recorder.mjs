@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = process.env.PRIVLEDGER_ROOT ?? path.resolve(here, "../../../..");
+const repoRoot = process.env.PRIVLEDGER_E2E_ROOT;
+if (!repoRoot || !path.isAbsolute(repoRoot)) {
+  throw new Error("PRIVLEDGER_E2E_ROOT is required to run the fake recorder safely.");
+}
 const vlogDir = path.join(repoRoot, "vlog");
 const cacheDir = path.join(repoRoot, ".privledger");
 
