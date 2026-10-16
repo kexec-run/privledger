@@ -89,18 +89,26 @@ This document lists the current web UI surfaces and the browser checks to run wi
   - Runs only `recording-real.spec.ts`.
 ## Current Verification Result
 
-Latest run in this checkout:
+Latest verification on 2026-10-16 used a temporary source snapshot with its own
+`config/env`, `vlog/`, `logs/`, and SQLite cache. The browser checks started their
+API and web servers automatically.
 
-1. `cd apps/api && npm test`
-   - Result: `18 passed`.
-2. `cd apps/web && npm run build`
+1. `cd apps/api && npm test && npm run build`
+   - Result: `18 passed`; API build passed.
+2. `python3 -m pytest -q`
+   - Result: `103 passed`.
+3. `cd apps/web && npm run build`
    - Result: passed.
-3. `cd apps/web && npm run test:e2e`
-   - Result: `9 passed`.
-4. `cd apps/web && npm run test:e2e:real`
-   - Result: `1 passed`.
+4. `cd apps/web && npm run test:e2e`
+   - Result: `9 passed`, including enrichment rejection and correction.
+5. `cd apps/web && npm run test:e2e:real`
+   - Result: `1 passed`, including the extracted life metadata component after recording.
+6. `scripts/dev.sh` start/status/restart/stop with separate ports and synthetic data
+   - Result: both services became healthy; stop left no listening processes.
 
-The real-recorder test creates a real dev recording in this test repo. Fake-recorder and disposable fixture specs clean up their generated files.
+The real-recorder test creates a real recording in the checkout running the tests.
+This verification kept it in the temporary source snapshot. Fake-recorder and
+fixture specs clean up their generated files.
 
 ## Execution Notes
 
@@ -110,6 +118,9 @@ The real-recorder test creates a real dev recording in this test repo. Fake-reco
 - The default E2E suite uses `apps/web/e2e/fixtures/fake-recorder.mjs`; the real camera is touched only by `npm run test:e2e:real`.
 - Fake-recorder tests assert cleanup: generated fake `vlog/TS.json`, fake media, and derived SQLite rows must be gone after refresh.
 - Disposable UI fixtures should omit `custom` unless a custom schema is enabled; `enrich.py` rejects any `custom` key when no custom schema is active.
+- Fixture-based specs use `setFixtureDate` to fix the browser date to June 29, 2026; recorder specs keep the real clock.
+- The fake-recorder spec waits for the fixture's readiness message before sending Stop, so startup timing cannot suppress its signal handler.
+- The default test configuration uses its checkout's data directory. Run it in a disposable source snapshot when the working checkout contains recordings; assumptions about empty dates otherwise depend on those files.
 - Always collect browser console warnings/errors at the end of each flow.
 
 ## Better Automation Shape
@@ -119,4 +130,3 @@ The real-recorder test creates a real dev recording in this test repo. Fake-reco
 3. Add one transcript fixture day so transcript summary expansion is tested, not only the no-transcript state.
 4. Add a screenshot-mode visual check with a small screenshot diff or DOM style assertion to prove thumbnail/transcript surfaces are blurred.
 5. Add an API-level test for the no-custom-schema payload invariant: UI should omit `custom` when custom enrichment is disabled.
-6. Keep expected fixture dates in `apps/web/e2e/helpers.ts` so tests do not depend on whatever real dates happen to exist in local `vlog/`.

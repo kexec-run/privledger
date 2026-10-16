@@ -2,10 +2,15 @@ import { expect, test } from "@playwright/test";
 import {
   cleanupRecordingFixture,
   refreshIndex,
+  setFixtureDate,
   writeRecordingFixture,
 } from "./helpers";
 
 const fixtureIds = ["e2e-calendar-a", "e2e-calendar-b"];
+
+test.beforeEach(async ({ page }) => {
+  await setFixtureDate(page);
+});
 
 test.afterEach(async ({ request }) => {
   fixtureIds.forEach(cleanupRecordingFixture);

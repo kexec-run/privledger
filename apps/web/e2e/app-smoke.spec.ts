@@ -3,10 +3,15 @@ import {
   cleanupRecordingFixture,
   collectConsole,
   refreshIndex,
+  setFixtureDate,
   writeRecordingFixture,
 } from "./helpers";
 
 const screenshotFixtureId = "e2e-screenshot";
+
+test.beforeEach(async ({ page }) => {
+  await setFixtureDate(page);
+});
 
 test.afterEach(async ({ request }) => {
   cleanupRecordingFixture(screenshotFixtureId);

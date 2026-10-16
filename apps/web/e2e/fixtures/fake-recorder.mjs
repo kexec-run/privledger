@@ -66,3 +66,4 @@ function stop() {
 process.on("SIGINT", stop);
 process.on("SIGTERM", stop);
 setInterval(() => {}, 1000);
+console.log("fake-recorder: ready");

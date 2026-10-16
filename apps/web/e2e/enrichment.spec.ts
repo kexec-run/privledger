@@ -2,10 +2,15 @@ import { expect, test } from "@playwright/test";
 import {
   cleanupRecordingFixture,
   refreshIndex,
+  setFixtureDate,
   writeRecordingFixture,
 } from "./helpers";
 
 const fixtureId = "e2e-enrichment";
+
+test.beforeEach(async ({ page }) => {
+  await setFixtureDate(page);
+});
 
 test.afterEach(async ({ request }) => {
   cleanupRecordingFixture(fixtureId);

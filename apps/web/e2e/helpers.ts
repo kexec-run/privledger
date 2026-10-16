@@ -5,6 +5,10 @@ import path from "node:path";
 export const repoRoot = path.resolve(process.cwd(), "../..");
 export const vlogDir = path.join(repoRoot, "vlog");
 
+export async function setFixtureDate(page: Page) {
+  await page.clock.setFixedTime(new Date("2026-06-29T12:00:00+05:30"));
+}
+
 type RecordingSummary = {
   id: string;
   startedAt: {

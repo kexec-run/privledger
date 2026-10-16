@@ -25,6 +25,10 @@ test("fake recorder starts from dialog, stops, selects latest, and opens enrichm
   await expect(page.getByTestId("session-dialog").getByRole("heading", { name: "Recording" })).toBeVisible();
   await expect.poll(() => recorderState(request)).toBe("recording");
   await expect(page.getByTestId("stop-recording-button")).toBeVisible();
+  await expect.poll(async () => {
+    const response = await request.get("/api/status");
+    return (await response.json()).recorder.recentLogs as string[];
+  }).toContain("fake-recorder: ready");
 
   await page.getByTestId("stop-recording-button").click();
   await expect(page.getByTestId("session-enrichment")).toBeVisible({ timeout: 20_000 });

@@ -3,10 +3,15 @@ import {
   cleanupRecordingFixture,
   openFirstCard,
   refreshIndex,
+  setFixtureDate,
   writeRecordingFixture,
 } from "./helpers";
 
 const fixtureIds = ["e2e-inspector-a", "e2e-inspector-b"];
+
+test.beforeEach(async ({ page }) => {
+  await setFixtureDate(page);
+});
 
 test.afterEach(async ({ request }) => {
   fixtureIds.forEach(cleanupRecordingFixture);
