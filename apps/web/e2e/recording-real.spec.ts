@@ -20,7 +20,7 @@ test("@real-recorder real Python recorder starts and stops from the UI", async (
   await expect.poll(() => recorderState(request), { timeout: 20_000 }).toBe("recording");
   await expect(page.getByTestId("session-dialog").getByRole("heading", { name: "Recording" })).toBeVisible();
 
-  await page.waitForTimeout(3_000);
+  await page.waitForTimeout(10_000);
   await page.getByTestId("stop-recording-button").click();
   await expect(page.getByTestId("session-enrichment")).toBeVisible({ timeout: 60_000 });
   await expect.poll(() => recorderState(request), { timeout: 20_000 }).toBe("idle");
@@ -31,7 +31,7 @@ test("@real-recorder real Python recorder starts and stops from the UI", async (
   expect(after[0]?.media.file).toBeTruthy();
   const mediaPath = `${repoRoot}/vlog/${after[0].media.file}`;
   const media = inspectMedia(mediaPath);
-  expect(media.durationSeconds).toBeGreaterThan(0);
+  expect(media.durationSeconds).toBeGreaterThan(1);
   expect(media.codecs.length).toBeGreaterThan(0);
   console.log(`Real media: ${media.durationSeconds.toFixed(2)}s (${media.codecs.join(", ")})`);
 

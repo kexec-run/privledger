@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { ApiError, jsonFetch } from "./apiClient";
 import { LifeMetadata } from "./components/LifeMetadata";
+import { EnrichmentForm as EnrichmentFormView, ENRICHMENT_METRIC_FIELDS } from "./components/EnrichmentForm";
+import { RecordingSessionDialog } from "./components/RecordingSessionDialog";
 import {
   compactDate,
   durationLabel,
@@ -159,21 +161,7 @@ function App() {
       ? null
       : guideSections.find((section) => section.title === selectedGuideTitle) ??
         defaultGuide;
-  const enrichmentMetricFields: Array<{
-    key: "mood" | "energy" | "stress" | "sleepiness" | "sleep_hours" | "caffeine_mg" | "body_weight";
-    label: string;
-    min?: number;
-    max?: number;
-    step?: number;
-  }> = [
-    { key: "mood", label: "Mood", min: 1, max: 5 },
-    { key: "energy", label: "Energy", min: 1, max: 5 },
-    { key: "stress", label: "Stress", min: 1, max: 5 },
-    { key: "sleepiness", label: "Sleepiness", min: 1, max: 5 },
-    { key: "sleep_hours", label: "Sleep hours", min: 0, step: 0.25 },
-    { key: "caffeine_mg", label: "Caffeine mg", min: 0 },
-    { key: "body_weight", label: "Body weight", min: 0, step: 0.1 },
-  ];
+  const enrichmentMetricFields = ENRICHMENT_METRIC_FIELDS;
 
   async function loadAll(date = selectedDate, tag: string | null = selectedTag) {
     setError(null);
@@ -448,157 +436,21 @@ function App() {
 
   function renderEnrichmentForm(closeLabel = "Close", onClose = () => setEnrichmentOpen(false)) {
     return (
-      <div className="enrichment-form" data-testid="enrichment-form">
-        {enrichmentForm ? (
-          <>
-            {enrichmentError ? (
-              <div className="enrichment-error">{enrichmentError}</div>
-            ) : null}
-            <div className="field-grid">
-              {enrichmentMetricFields.map((field) => (
-                <label
-                  key={field.key}
-                  className={fieldErrors[field.key] ? "invalid-field" : ""}
-                  data-testid={`enrichment-field-${field.key}`}
-                >
-                  <span>{field.label}</span>
-                  <input
-                    data-testid={`enrichment-input-${field.key}`}
-                    type="number"
-                    min={field.min}
-                    max={field.max}
-                    step={field.step ?? 1}
-                    value={enrichmentForm[field.key] ?? ""}
-                    onChange={(event) =>
-                      setEnrichmentValue(
-                        field.key,
-                        event.currentTarget.value === ""
-                          ? null
-                          : Number(event.currentTarget.value),
-                      )
-                    }
-                  />
-                  {fieldErrors[field.key] ? (
-                    <small>{fieldErrors[field.key]}</small>
-                  ) : null}
-                </label>
-              ))}
-            </div>
-
-            <label
-              className={`wide-field ${fieldErrors.focus_domain ? "invalid-field" : ""}`}
-              data-testid="enrichment-field-focus_domain"
-            >
-              <span>Focus domain</span>
-              <select
-                data-testid="enrichment-input-focus_domain"
-                value={enrichmentForm.focus_domain ?? ""}
-                onChange={(event) =>
-                  setEnrichmentValue(
-                    "focus_domain",
-                    event.currentTarget.value || null,
-                  )
-                }
-              >
-                <option value="">None</option>
-                {(enrichment?.tag_vocabulary ?? tags).map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
-                  </option>
-                ))}
-              </select>
-              {fieldErrors.focus_domain ? (
-                <small>{fieldErrors.focus_domain}</small>
-              ) : null}
-            </label>
-
-            <div className={`tag-picker ${fieldErrors.tags ? "invalid-field" : ""}`} data-testid="enrichment-tags">
-              {(enrichment?.tag_vocabulary ?? tags).map((tag) => (
-                <button
-                  key={tag}
-                  className={enrichmentForm.tags.includes(tag) ? "active" : ""}
-                  onClick={() => toggleTag(tag)}
-                >
-                  {tag}
-                </button>
-              ))}
-              {fieldErrors.tags ? <small>{fieldErrors.tags}</small> : null}
-            </div>
-
-            <label className={`wide-field ${fieldErrors.location ? "invalid-field" : ""}`} data-testid="enrichment-field-location">
-              <span>Location</span>
-              <input
-                data-testid="enrichment-input-location"
-                value={enrichmentForm.location ?? ""}
-                onChange={(event) =>
-                  setEnrichmentValue("location", event.currentTarget.value || null)
-                }
-              />
-              {fieldErrors.location ? <small>{fieldErrors.location}</small> : null}
-            </label>
-
-            {enrichment?.custom.enabled ? (
-              <div className="custom-fields">
-                <h4>Custom</h4>
-                {enrichment.custom.fields.map((field) => (
-                  <label
-                    key={field.name}
-                    className={fieldErrors.custom ? "invalid-field" : ""}
-                  >
-                    <span>{field.name}</span>
-                    {field.type === "boolean" ? (
-                      <input
-                        type="checkbox"
-                        checked={Boolean(enrichmentForm.custom[field.name])}
-                        onChange={(event) =>
-                          setCustomValue(field.name, event.currentTarget.checked)
-                        }
-                      />
-                    ) : (
-                      <input
-                        type={
-                          field.type === "integer" || field.type === "number"
-                            ? "number"
-                            : "text"
-                        }
-                        step={field.type === "number" ? 0.1 : 1}
-                        value={String(enrichmentForm.custom[field.name] ?? "")}
-                        onChange={(event) =>
-                          setCustomValue(
-                            field.name,
-                            event.currentTarget.value === ""
-                              ? null
-                              : field.type === "integer" || field.type === "number"
-                                ? Number(event.currentTarget.value)
-                                : event.currentTarget.value,
-                          )
-                        }
-                      />
-                    )}
-                    {fieldErrors.custom ? <small>{fieldErrors.custom}</small> : null}
-                  </label>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="enrichment-actions">
-              <button className="button neutral" disabled={busy} onClick={onClose}>
-                {closeLabel}
-              </button>
-              <button
-                className="button record"
-                data-testid="save-enrichment-button"
-                disabled={busy}
-                onClick={() => void submitEnrichment()}
-              >
-                Save enrichment
-              </button>
-            </div>
-          </>
-        ) : (
-          <p className="muted-copy">Loading enrichment fields…</p>
-        )}
-      </div>
+      <EnrichmentFormView
+        description={enrichment}
+        values={enrichmentForm}
+        tags={tags}
+        fields={enrichmentMetricFields}
+        errors={fieldErrors}
+        error={enrichmentError}
+        busy={busy}
+        closeLabel={closeLabel}
+        onClose={onClose}
+        onValueChange={setEnrichmentValue}
+        onCustomChange={setCustomValue}
+        onToggleTag={toggleTag}
+        onSubmit={() => void submitEnrichment()}
+      />
     );
   }
 
@@ -858,7 +710,7 @@ function App() {
                 <div className="section-heading compact">
                   <h3>Enrichment</h3>
                 </div>
-                {!enrichmentOpen ? (
+                {!sessionOpen && !enrichmentOpen ? (
                   <button
                     className="button enrich-primary"
                     data-testid="enrich-metadata-button"
@@ -867,7 +719,7 @@ function App() {
                     Enrich metadata
                   </button>
                 ) : null}
-                {enrichmentOpen ? renderEnrichmentForm() : null}
+                {!sessionOpen && enrichmentOpen ? renderEnrichmentForm() : null}
               </section>
 
               <section className="inspector-block transcript-block">
@@ -932,186 +784,25 @@ function App() {
         </aside>
       </section>
       {sessionOpen ? (
-        <div className="session-overlay" role="presentation">
-          <section
-            className={`session-dialog ${activeSessionPhase ?? "recording"}`}
-            data-testid="session-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="session-title"
-          >
-            <header className="session-header">
-              <div>
-                <span className="session-kicker">
-                  <Circle size={11} fill="currentColor" />
-                  {activeSessionPhase === "enrichment"
-                    ? "Recording complete"
-                    : activeSessionPhase === "prepare"
-                      ? "Prepare"
-                      : "Recording"}
-                </span>
-                <h2 id="session-title">
-                  {activeSessionPhase === "enrichment"
-                    ? "Enrich metadata"
-                    : activeSessionPhase === "saving"
-                      ? "Saving recording"
-                      : activeSessionPhase === "prepare"
-                        ? "Prepare recording"
-                        : "Recording"}
-                </h2>
-              </div>
-              <div className="session-controls">
-                {activeSessionPhase === "recording" ? (
-                  <strong className="session-timer">{recordingElapsed}</strong>
-                ) : null}
-                {activeSessionPhase === "prepare" ? (
-                  <>
-                    <button
-                      className="button neutral"
-                      data-testid="cancel-recording-button"
-                      disabled={busy}
-                      onClick={() => setSessionPhase(null)}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      className="button record session-stop"
-                      data-testid="start-recording-button"
-                      disabled={busy}
-                      onClick={() => void recordAction("start")}
-                    >
-                      <Circle size={15} fill="currentColor" />
-                      Start recording
-                    </button>
-                  </>
-                ) : null}
-                {activeSessionPhase === "recording" ? (
-                  <button
-                    className="button record session-stop"
-                    data-testid="stop-recording-button"
-                    disabled={busy}
-                    onClick={() => void recordAction("stop")}
-                  >
-                    <Square size={15} fill="currentColor" />
-                    Stop recording
-                  </button>
-                ) : null}
-                {activeSessionPhase === "enrichment" ? (
-                  <button
-                    className="icon-button ghost"
-                    aria-label="Close session dialog"
-                    onClick={() => setSessionPhase(null)}
-                  >
-                    <X size={19} />
-                  </button>
-                ) : null}
-              </div>
-            </header>
-
-            {activeSessionPhase === "saving" ? (
-              <div className="session-saving">
-                <RefreshCw size={24} />
-                <div>
-                  <strong>Saving locally</strong>
-                  <span>Stopping recorder, refreshing index, and finding the new JSON.</span>
-                </div>
-              </div>
-            ) : null}
-
-            {activeSessionPhase === "prepare" || activeSessionPhase === "recording" ? (
-              <>
-                <div className="session-status-line">
-                  {activeSessionPhase === "prepare" ? (
-                    <>
-                      <span>Recorder not started</span>
-                      <span>Read prompts, then start when ready</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Saving locally</span>
-                      <span>Camera owned by Python recorder</span>
-                    </>
-                  )}
-                </div>
-
-                <section className="guide-panel">
-                  <div className="guide-heading">
-                    <div>
-                      <span className="eyeless-label">{recordingGuide?.source ?? "docs/questions.md"}</span>
-                      <h3>questions.md guide</h3>
-                    </div>
-                    <p>Use these as prompts, not a checklist.</p>
-                  </div>
-
-                  {guideSections.length > 0 ? (
-                    <div className="guide-section-list">
-                      {guideSections.slice(0, 6).map((section) => {
-                        const isExpanded = section === selectedGuide;
-
-                        return (
-                          <div
-                            className={`guide-section ${isExpanded ? "expanded" : ""}`}
-                            key={section.title}
-                          >
-                            <button
-                              aria-expanded={isExpanded}
-                              className="guide-section-title"
-                              data-testid="guide-section-title"
-                              data-guide-title={section.title}
-                              onClick={() =>
-                                setSelectedGuideTitle(isExpanded ? "" : section.title)
-                              }
-                              type="button"
-                            >
-                              <span>{section.title}</span>
-                              <small>{section.prompts.length} prompts</small>
-                              <ChevronDown size={17} />
-                            </button>
-                            <div
-                              aria-hidden={!isExpanded}
-                              className={`prompt-region ${isExpanded ? "open" : ""}`}
-                              data-testid="prompt-region"
-                            >
-                              <div className="prompt-list">
-                                {section.prompts.slice(0, 5).map((prompt) => (
-                                  <div className="prompt-card" key={prompt}>
-                                    {prompt}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="muted-copy">No guide prompts found.</p>
-                  )}
-                </section>
-
-                {activeSessionPhase === "recording" ? (
-                  <div className="quick-metadata-row">
-                    <span>Enrichment opens after stop</span>
-                    <strong>mood, energy, stress, sleepiness, tags</strong>
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-
-            {activeSessionPhase === "enrichment" ? (
-              <section className="session-enrichment" data-testid="session-enrichment">
-                <p className="muted-copy">
-                  Recording saved. Add life metadata now, or close and re-enrich from the
-                  inspector later.
-                </p>
-                {renderEnrichmentForm("Enrich later", () => {
-                  setSessionPhase(null);
-                  setEnrichmentOpen(false);
-                })}
-              </section>
-            ) : null}
-          </section>
-        </div>
+        <RecordingSessionDialog
+          phase={activeSessionPhase ?? "recording"}
+          elapsed={recordingElapsed}
+          busy={busy}
+          guideSource={recordingGuide?.source}
+          guideSections={guideSections}
+          selectedGuide={selectedGuide}
+          enrichmentForm={activeSessionPhase === "enrichment"
+            ? renderEnrichmentForm("Enrich later", () => {
+                setSessionPhase(null);
+                setEnrichmentOpen(false);
+              })
+            : null}
+          onCancel={() => setSessionPhase(null)}
+          onStart={() => void recordAction("start")}
+          onStop={() => void recordAction("stop")}
+          onClose={() => setSessionPhase(null)}
+          onGuideSelect={setSelectedGuideTitle}
+        />
       ) : null}
     </main>
   );
