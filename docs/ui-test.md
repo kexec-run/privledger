@@ -75,6 +75,8 @@ This document lists the current web UI surfaces and the browser checks to run wi
    - Starts recording from prepare mode.
    - Stops recording from the dialog.
    - Verifies a new latest recording appears.
+   - Confirms Python created basic metadata, then submits enrichment from the dialog and checks saved values.
+   - Checks recorded media duration/codecs and the cached thumbnail response.
 
 ## Commands
 
@@ -106,7 +108,9 @@ Do not invoke Playwright directly for these specs: fixture helpers require `PRIV
 
 ## Isolation Checks
 
-The launcher tests verify that it creates only the directories and files needed for an isolated run, does not copy working recordings or cache, replaces inherited path/command overrides with test-local values, and removes only the exact temporary workspace it created. Each browser run starts fresh with an empty `vlog/`, logs directory, and SQLite cache.
+The launcher tests verify that it creates only the directories and files needed for an isolated run, does not copy working recordings or cache, replaces inherited path/command overrides with test-local values, and removes only the exact temporary workspace it created. Each browser run starts fresh with an empty `vlog/`, logs directory, and SQLite cache. Integration checks send `SIGINT` after the test servers become ready and `SIGTERM` while a fake recorder is active. They assert that the recorder and both servers stop, the temporary workspace is removed, and an unrelated sentinel file survives. Both signals request Playwright's graceful `SIGINT` teardown; the launcher awaits its completion before deleting test data.
+
+Run these launcher checks with `cd apps/web && npm run test:e2e:launcher`.
 
 The real-recorder test is opt-in because it requires camera and microphone permissions. Its failure artifacts are kept for diagnosis; successful temporary recordings are deleted after the services exit.
 

@@ -104,30 +104,20 @@ function runPlaywright(args, env) {
   });
 
   let interrupted = false;
-  let killTimer;
-  const interrupt = (signal) => {
+  const interrupt = () => {
     if (!child.pid || interrupted) return;
     interrupted = true;
-    try {
-      if (process.platform !== "win32") process.kill(-child.pid, signal);
-      else child.kill(signal);
-    } catch {}
-    killTimer = setTimeout(() => {
-      try {
-        if (process.platform !== "win32") process.kill(-child.pid, "SIGKILL");
-        else child.kill("SIGKILL");
-      } catch {}
-    }, 10_000);
+    // Playwright handles SIGINT by awaiting test and web-server teardown.
+    child.kill("SIGINT");
   };
-  const onInt = () => interrupt("SIGINT");
-  const onTerm = () => interrupt("SIGTERM");
+  const onInt = interrupt;
+  const onTerm = interrupt;
   process.on("SIGINT", onInt);
   process.on("SIGTERM", onTerm);
 
   return new Promise((resolve, reject) => {
     child.once("error", reject);
     child.once("close", (code, signal) => {
-      clearTimeout(killTimer);
       process.off("SIGINT", onInt);
       process.off("SIGTERM", onTerm);
       resolve(interrupted ? 1 : code ?? (signal ? 1 : 0));
