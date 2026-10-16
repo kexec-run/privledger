@@ -1,26 +1,36 @@
 # Privledger
 
-A local video journal for recording short daily entries, enriching them with life metadata, and reviewing patterns over time. The Python pipeline writes the durable files; the web app and API provide recording, calendar, transcript, and enrichment views.
+**A local video journal for your thoughts and the context around them.**
 
-## Demo
+Record with optional prompts, add mood, sleep, and tags afterward, and revisit entries through a calendar. Your videos, transcripts, and metadata live as files on your machine.
 
-Screenshots use synthetic metadata and generated media. They contain no personal recordings.
+![Privledger dashboard showing a calendar, tagged recordings, and life metadata](docs/screenshots/dashboard.png)
 
-![Privledger dashboard with synthetic recordings](docs/screenshots/dashboard.png)
+*Browse recordings by day and tag, with the selected entry's context alongside it. All screenshots use synthetic metadata and generated media.*
 
-<details>
-<summary>Recording guide</summary>
+## Why use it?
 
-![Recording guide shown before recording starts](docs/screenshots/recording-guide.png)
-</details>
+- Optional prompts give you somewhere to start when you have nothing to say.
+- Mood, energy, stress, sleep, and tags keep the context attached to each recording.
+- Calendar and tag filters help you return to an entry without searching through a folder of videos.
 
-<details>
-<summary>Post-recording enrichment dialog</summary>
+## From thought to journal entry
 
-![Enrichment dialog for a synthetic recording](docs/screenshots/enrichment-dialog.png)
-</details>
+### Prepare and record
 
-## Requirements
+<img src="docs/screenshots/recording-guide.png" alt="Prepare recording dialog with optional questions and a Start recording button" width="720">
+
+*Read the prompts, then start when you're ready. The guide stays available while you record.*
+
+### Add context afterward
+
+<img src="docs/screenshots/enrichment-dialog.png" alt="Post-recording enrichment dialog with life metadata fields and tags" width="720">
+
+*After recording, add life metadata and tags. You can also enrich the entry later from the dashboard.*
+
+## Get started
+
+### Requirements
 
 - macOS or Linux
 - Python 3.10+
@@ -31,7 +41,7 @@ Screenshots use synthetic metadata and generated media. They contain no personal
 
 Linux capture also uses v4l2 video devices, PulseAudio or PipeWire with `pactl`, and a VAAPI-capable ffmpeg setup. macOS capture uses the AVFoundation camera helper in `tools/avcam-cli`.
 
-## Install
+### Install
 
 Create a Python environment and install the pipeline dependencies:
 
@@ -63,7 +73,7 @@ cp config/env.sample config/env
 
 Edit `config/env` for the capture device and pipeline values. Linux and macOS capture requirements differ; use the [operations guide](docs/operations.md) for device discovery and troubleshooting.
 
-## Run the Web App
+### Run the web app
 
 Start both local services:
 
