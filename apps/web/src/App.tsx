@@ -1,268 +1,45 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
-  BatteryFull,
-  BatteryLow,
-  BatteryMedium,
-  Bed,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Circle,
-  Cloud,
-  Coffee,
   Database,
   Eye,
   EyeOff,
   FileJson,
-  Frown,
-  Gauge,
-  Laugh,
-  Meh,
-  Moon,
   RefreshCw,
-  Scale,
   Search,
   ShieldCheck,
-  Smile,
   Square,
   Tag,
   Video,
   X,
-  Zap,
-  ZapOff,
-  type LucideIcon,
 } from "lucide-react";
-
-type Recording = {
-  id: string;
-  startedAt: {
-    utc: string | null;
-    local: string | null;
-    dateLocal: string | null;
-  };
-  quality: string | null;
-  media: {
-    file: string | null;
-    exists: boolean;
-    url: string | null;
-    thumbnailUrl: string | null;
-    infoUrl: string | null;
-    device: string | null;
-  };
-  transcript: {
-    file: string | null;
-    exists: boolean;
-    language: string | null;
-    segmentCount: number | null;
-    preview: string | null;
-    url: string | null;
-  };
-  life: {
-    mood: number | null;
-    energy: number | null;
-    stress: number | null;
-    sleepiness: number | null;
-    sleepHours: number | null;
-    caffeineMg: number | null;
-    bodyWeight: number | null;
-    focusDomain: string | null;
-    tags: string[];
-    location: string | null;
-  };
-  index: {
-    status: string;
-    error: string | null;
-  };
-};
-
-type CalendarDay = {
-  date_local: string;
-  recording_count: number;
-  bad_count: number;
-  good_count: number;
-  transcript_count: number;
-  avg_mood: number | null;
-  avg_energy: number | null;
-  avg_stress: number | null;
-  avg_sleepiness: number | null;
-  avg_sleep_hours: number | null;
-  total_caffeine_mg: number | null;
-  tags: string[];
-};
-
-type Facets = {
-  tags: string[];
-  tagCounts: Record<string, number>;
-  focusDomains: string[];
-  qualities: string[];
-  dateRange: {
-    from: string | null;
-    to: string | null;
-  };
-};
-
-type Status = {
-  recorder: {
-    state: "idle" | "recording" | "stopping" | "last_error";
-    pid: number | null;
-    startedAt: string | null;
-    lastExitCode: number | null;
-    lastError: string | null;
-    recentLogs: string[];
-  };
-};
-
-type CustomField = {
-  name: string;
-  type: "integer" | "number" | "boolean" | "string";
-  value: string | number | boolean | null;
-};
-
-type EnrichmentDescription = {
-  id: string;
-  values: {
-    mood: number | null;
-    energy: number | null;
-    stress: number | null;
-    sleepiness: number | null;
-    sleep_hours: number | null;
-    caffeine_mg: number | null;
-    body_weight: number | null;
-    focus_domain: string | null;
-    tags: string[];
-    location: string | null;
-  };
-  tag_vocabulary: string[];
-  custom: {
-    enabled: boolean;
-    schema_hash: string | null;
-    fields: CustomField[];
-  };
-};
-
-type EnrichmentForm = EnrichmentDescription["values"] & {
-  custom: Record<string, string | number | boolean | null>;
-};
-
-type StopResponse = Status["recorder"] & {
-  latestRecording?: Recording | null;
-};
-
-type MediaInfo = {
-  file: string | null;
-  exists: boolean;
-  durationSeconds: number | null;
-  thumbnailUrl: string | null;
-};
-
-type RecordingGuide = {
-  source: string;
-  sections: Array<{
-    title: string;
-    prompts: string[];
-  }>;
-};
-
-class ApiError extends Error {
-  field: string | null;
-  fieldErrors: Record<string, string>;
-
-  constructor(
-    message: string,
-    field: string | null = null,
-    fieldErrors: Record<string, string> = {},
-  ) {
-    super(message);
-    this.name = "ApiError";
-    this.field = field;
-    this.fieldErrors = fieldErrors;
-  }
-}
+import { ApiError, jsonFetch } from "./apiClient";
+import { LifeMetadata } from "./components/LifeMetadata";
+import {
+  compactDate,
+  durationLabel,
+  formatLocalDate,
+  localTime,
+  numberOrDash,
+  timerLabel,
+} from "./formatters";
+import type {
+  CalendarDay,
+  EnrichmentDescription,
+  EnrichmentForm,
+  Facets,
+  MediaInfo,
+  Recording,
+  RecordingGuide,
+  Status,
+  StopResponse,
+} from "./types";
 
 const fallbackDate = formatLocalDate(new Date());
-
-function localTime(value: string | null) {
-  if (!value) return "--:--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.slice(11, 16);
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function compactDate(date: string) {
-  const parsed = new Date(`${date}T00:00:00`);
-  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function numberOrDash(value: number | null, suffix = "") {
-  return value === null || value === undefined ? "—" : `${value}${suffix}`;
-}
-
-function durationLabel(seconds: number | null | undefined) {
-  if (seconds === null || seconds === undefined) return "Length unavailable";
-  const totalSeconds = Math.max(0, Math.round(seconds));
-  const minutes = Math.floor(totalSeconds / 60);
-  const remainingSeconds = `${totalSeconds % 60}`.padStart(2, "0");
-  return `${minutes}:${remainingSeconds}`;
-}
-
-function timerLabel(startedAt: string | null | undefined, now: number) {
-  if (!startedAt) return "00:00";
-  const started = Date.parse(startedAt);
-  if (Number.isNaN(started)) return "00:00";
-  const elapsedSeconds = Math.max(0, Math.floor((now - started) / 1000));
-  const hours = Math.floor(elapsedSeconds / 3600);
-  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-  const seconds = `${elapsedSeconds % 60}`.padStart(2, "0");
-  if (hours > 0) {
-    return `${hours}:${`${minutes}`.padStart(2, "0")}:${seconds}`;
-  }
-  return `${minutes}:${seconds}`;
-}
-
-function iconFor(value: number | null | undefined, choices: Array<[number, LucideIcon]>, fallback: LucideIcon) {
-  if (value === null || value === undefined) return fallback;
-  for (const [max, Icon] of choices) {
-    if (value <= max) return Icon;
-  }
-  return fallback;
-}
-
-function moodIcon(value: number | null | undefined) {
-  return iconFor(value, [[1, Frown], [2, Meh], [4, Smile]], Laugh);
-}
-
-function energyIcon(value: number | null | undefined) {
-  return iconFor(value, [[1, ZapOff], [2, BatteryLow], [3, BatteryMedium], [4, BatteryFull]], Zap);
-}
-
-function stressIcon(value: number | null | undefined) {
-  return iconFor(value, [[4, Gauge]], AlertTriangle);
-}
-
-function sleepinessIcon(value: number | null | undefined) {
-  return iconFor(value, [[1, Eye], [2, Cloud], [4, Moon]], Bed);
-}
-
-function LifeChip({
-  className,
-  icon: Icon,
-  label,
-  value,
-}: {
-  className: string;
-  icon: LucideIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <span className={`life-chip ${className}`}>
-      <Icon size={14} />
-      {label} {value}
-    </span>
-  );
-}
 
 function formFromDescription(description: EnrichmentDescription): EnrichmentForm {
   return {
@@ -291,48 +68,6 @@ function inferEnrichmentField(message: string): keyof EnrichmentDescription["val
   return fields.find((field) => lower.includes(field)) ?? null;
 }
 
-async function jsonFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    let payload: {
-      error?: unknown;
-      message?: unknown;
-      field?: unknown;
-      field_errors?: unknown;
-    } = {};
-    try {
-      payload = (await response.json()) as {
-        error?: unknown;
-        message?: unknown;
-        field?: unknown;
-        field_errors?: unknown;
-      };
-    } catch {
-      payload = {};
-    }
-    const fieldErrors =
-      payload.field_errors &&
-      typeof payload.field_errors === "object" &&
-      !Array.isArray(payload.field_errors)
-        ? Object.fromEntries(
-            Object.entries(payload.field_errors).filter(
-              (entry): entry is [string, string] => typeof entry[1] === "string",
-            ),
-          )
-        : {};
-    throw new ApiError(
-      typeof payload.message === "string"
-        ? payload.message
-        : typeof payload.error === "string"
-          ? payload.error
-          : `${response.status} ${response.statusText}`,
-      typeof payload.field === "string" ? payload.field : null,
-      fieldErrors,
-    );
-  }
-  return (await response.json()) as T;
-}
-
 function buildMonthCells(month: string) {
   const [year, monthValue] = month.split("-").map(Number);
   const first = new Date(year, monthValue - 1, 1);
@@ -350,13 +85,6 @@ function buildMonthCells(month: string) {
       currentMonth: iso.startsWith(month),
     };
   });
-}
-
-function formatLocalDate(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 function App() {
@@ -1124,61 +852,7 @@ function App() {
                 </div>
               </section>
 
-              <section className="inspector-block" data-testid="life-metadata-block">
-                <h3>Life metadata</h3>
-                <div className="life-grid">
-                  <div className="life-grid-row life-grid-row-primary">
-                    <LifeChip
-                      className="mood"
-                      icon={moodIcon(selectedRecording.life.mood)}
-                      label="mood"
-                      value={numberOrDash(selectedRecording.life.mood)}
-                    />
-                    <LifeChip
-                      className="energy"
-                      icon={energyIcon(selectedRecording.life.energy)}
-                      label="energy"
-                      value={numberOrDash(selectedRecording.life.energy)}
-                    />
-                    <LifeChip
-                      className="stress"
-                      icon={stressIcon(selectedRecording.life.stress)}
-                      label="stress"
-                      value={numberOrDash(selectedRecording.life.stress)}
-                    />
-                    <LifeChip
-                      className="sleepiness"
-                      icon={sleepinessIcon(selectedRecording.life.sleepiness)}
-                      label="sleepy"
-                      value={numberOrDash(selectedRecording.life.sleepiness)}
-                    />
-                  </div>
-                  <div className="life-grid-row life-grid-row-secondary">
-                    <LifeChip
-                      className="sleep-hours"
-                      icon={Bed}
-                      label="sleep hrs"
-                      value={numberOrDash(selectedRecording.life.sleepHours, "h")}
-                    />
-                    {selectedRecording.life.caffeineMg !== null ? (
-                      <LifeChip
-                        className="caffeine"
-                        icon={Coffee}
-                        label="caffeine"
-                        value={numberOrDash(selectedRecording.life.caffeineMg, "mg")}
-                      />
-                    ) : null}
-                    {selectedRecording.life.bodyWeight !== null ? (
-                      <LifeChip
-                        className="body-weight"
-                        icon={Scale}
-                        label="weight"
-                        value={numberOrDash(selectedRecording.life.bodyWeight)}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              </section>
+              <LifeMetadata life={selectedRecording.life} />
 
               <section className="inspector-block enrichment-block" data-testid="enrichment-block">
                 <div className="section-heading compact">

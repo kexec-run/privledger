@@ -24,4 +24,11 @@ test("@real-recorder real Python recorder starts and stops from the UI", async (
   const after = await getRecordings(request, { limit: "1" });
   expect(after[0]?.id).toBeTruthy();
   expect(after[0]?.id).not.toEqual(before[0]?.id);
+
+  await page.getByLabel("Close session dialog").click();
+  const latestCard = page.locator(`[data-recording-id="${after[0].id}"]`);
+  await expect(latestCard).toBeVisible({ timeout: 20_000 });
+  await latestCard.click();
+  await expect(page.getByTestId("inspector-panel")).toBeVisible();
+  await expect(page.getByTestId("life-metadata-block")).toBeVisible();
 });
