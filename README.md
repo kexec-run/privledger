@@ -16,6 +16,24 @@ README is the entrypoint. Detailed contracts live under `docs/`.
 
 Capture pipeline exists. Metadata writes are schema-validated and atomic. Enrichment CLI is functional. Tag/focus invariants and supervisor behavior are encoded in tests.
 
+## Demo Screenshots
+
+These screenshots use synthetic metadata and a generated video frame; no personal recordings are included.
+
+![Privledger dashboard with synthetic recordings](docs/screenshots/dashboard.png)
+
+<details>
+<summary>Recording guide</summary>
+
+![Recording guide shown before recording starts](docs/screenshots/recording-guide.png)
+</details>
+
+<details>
+<summary>Post-recording enrichment dialog</summary>
+
+![Enrichment dialog for a synthetic recording](docs/screenshots/enrichment-dialog.png)
+</details>
+
 ## Quick Start
 
 Install Python dependencies:
@@ -70,6 +88,11 @@ PYTHONPATH=. pytest tests/test_writer_invariants.py tests/test_enrich_behavior.p
 ## Tasks
 
 See [TODO.md](TODO.md) for current status and planned work.
+
+## License
+
+Privledger is licensed under the [MIT License](LICENSE).
+The `tools/avcam-cli` submodule retains its own MIT license and copyright notice.
 
 ## Requirements
 

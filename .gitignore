@@ -1,9 +1,7 @@
 # Personal data and media
 vlog/*
-!vlog/.gitkeep
 
 logs/*
-!logs/.gitkeep
 
 config/env
 
@@ -26,6 +24,8 @@ tools/avcam-cli/.build/
 # Local-only agent/tooling files
 .pre-commit-config.yaml
 .serena/
+.codebase-memory/
+.codegraph/
 AGENTS.md
 
 # Python
