@@ -145,62 +145,33 @@ These invariants describe boundaries that should remain true as the project evol
 
 ## Project Tree
 
-Generated artifacts and local data volume details are omitted.
+Generated artifacts and local data volume details are omitted. The ignored runtime directories are created locally.
 
 ```text
 .
-├── config/ - runtime configuration and controlled vocabularies
+├── apps/
+│   ├── api/ - Fastify API, SQLite index, and pipeline process control
+│   └── web/ - React dashboard and isolated Playwright tests
+├── config/ - sample runtime configuration and controlled vocabularies
 │   ├── custom_schema.yaml
-│   ├── env
 │   ├── env.sample
 │   └── tags.txt
-├── docs/ - contracts and operating notes
-│   ├── arch.md
-│   ├── enrichment.md
-│   ├── metadata.md
-│   ├── operations.md
-│   ├── questions.md
-│   ├── tags.md
-│   ├── test.md
-│   └── transcript.md
-├── logs/ - disposable capture logs
-│   └── .gitkeep
+├── docs/ - architecture, operations, schemas, and test guidance
 ├── metadata/ - metadata invariants, rewrite policy, and persistence
-│   ├── __init__.py
-│   ├── check.py
-│   ├── custom_schema.py
-│   ├── rewrite.py
-│   ├── tags.py
-│   └── writer.py
 ├── schemas/ - runtime JSON schema contracts
-│   ├── metadata.v1.schema.json
-│   ├── transcript.v1.schema.json
-│   └── translation.v1.schema.json
-├── scripts/ - command entrypoints and orchestration
-│   ├── enrich.py
-│   ├── privledger.py
-│   ├── privledger-linux.py
-│   ├── privledger-mac.py
-│   ├── record-linux.sh
-│   ├── record-mac.sh
-│   └── transcript_batch.py
-├── tests/ - behavior and schema verification
-│   ├── test_check.py
-│   ├── test_enrich_behavior.py
-│   ├── test_metadata_rewrite.py
-│   ├── test_supervisor_behavior.py
-│   ├── test_transcript_batch.py
-│   ├── test_transcript_schema.py
-│   └── test_writer_invariants.py
-├── vlog/ - durable media and metadata store
-│   ├── .gitkeep
-│   └── TS.json / TS.mkv / TS.mkv.bad.mkv / TS.mov / TS.mov.bad.mov
-├── .pre-commit-config.yaml
-├── AGENTS.md
+├── scripts/ - Python pipeline, platform recorder commands, and dev lifecycle
+│   └── dev.sh
+├── tests/ - Python behavior and schema verification
+├── tools/avcam-cli - macOS camera capture submodule
 ├── README.md
 ├── requirements.txt
-├── schema_validation.py
-└── TODO.md
+└── schema_validation.py
+
+Local ignored runtime directories:
+  vlog/          durable recordings, metadata, and transcripts
+  logs/          disposable capture logs
+  .privledger/   rebuildable SQLite index, thumbnails, and dev service state
+```
 ```
 
 ## Known Tradeoffs

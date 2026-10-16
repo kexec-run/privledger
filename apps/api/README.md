@@ -19,14 +19,16 @@ The dev server listens on `127.0.0.1:4577` by default.
 
 ## Environment
 
-- `PRIVLEDGER_ROOT`: repo root override.
+- `PRIVLEDGER_ROOT`: repository/data root override.
 - `PRIVLEDGER_INDEX_DB`: SQLite cache path override.
-- `PRIVLEDGER_API_HOST`: host override.
-- `PRIVLEDGER_API_PORT`: port override.
+- `PRIVLEDGER_API_HOST`: bind host (defaults to loopback).
+- `PRIVLEDGER_API_PORT`: API port (defaults to `4577`).
 - `PRIVLEDGER_RECORD_COMMAND`: command used by `POST /api/recordings/start`.
+- `PRIVLEDGER_ENRICH_COMMAND`: command used by enrichment requests.
 - `PRIVLEDGER_TRANSCRIBE_COMMAND`: command used by `POST /api/transcripts/transcribe-missing`.
+- `PRIVLEDGER_THUMBNAIL_COMMAND` and `PRIVLEDGER_FFPROBE_COMMAND`: media utility overrides.
 
-Command overrides are whitespace-split and executed directly, not through a shell.
+Command overrides are whitespace-split and executed directly, not through a shell. The API reads Python configuration and artifacts from `PRIVLEDGER_ROOT`; the SQLite path can be overridden independently.
 
 ## Main Endpoints
 

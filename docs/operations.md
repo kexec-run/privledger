@@ -4,22 +4,50 @@ This doc covers local setup, commands, recording, enrichment, and verification.
 
 ## Requirements
 
-Python dependencies are listed in `requirements.txt`.
+The repository has two capture backends:
 
-Runtime configuration lives in `config/env`.
-Tag vocabulary lives in `config/tags.txt`.
+- **Linux:** Python dependencies from `requirements.txt`, ffmpeg built with VAAPI, `pactl` from PulseAudio or PipeWire, and a v4l2 camera under `/dev/video*`. Set `VIDEO_DEV`, `AUDIO_SRC`, and `VAAPI_DEV` in `config/env`.
+- **macOS:** Python dependencies, ffmpeg/ffprobe, the `tools/avcam-cli` submodule, and Camera and Microphone permissions for the process launching the API or CLI. Set the camera device in `config/env` as needed by the helper.
+
+Use a Python virtual environment before installing `requirements.txt`. Keep runtime configuration in the ignored `config/env`; `config/env.sample` contains the public template. For browser-based capture, grant permissions to the terminal or app that launched `scripts/dev.sh`.
+
+## Device Discovery
+
+On Linux, inspect available devices with:
+
+```bash
+ls /dev/video*
+ls /dev/dri/render*
+pactl list short sources
+ffmpeg -hwaccels | grep vaapi
+```
+
+Set the selected camera, audio source, and render device in `config/env`. If VAAPI is not listed by ffmpeg, hardware encoding will not work.
+
+On macOS, initialize the camera helper with `git submodule update --init --recursive`. Build it from `tools/avcam-cli` if the checked-out helper does not include a usable binary. Confirm Camera and Microphone permissions for the process context running the recorder. Sandboxed automation can report `Camera access is denied` even when the command works from a permitted terminal.
 
 ## Commands
 
-Record a session:
+Start the API and web app:
+
+```bash
+./scripts/dev.sh start
+./scripts/dev.sh status
+./scripts/dev.sh restart
+./scripts/dev.sh stop
+```
+
+The dashboard is served at `http://127.0.0.1:5173`; the API is at `http://127.0.0.1:4577`. Install Node dependencies in both `apps/api` and `apps/web` before starting.
+
+Run the Python recorder directly:
 
 ```bash
 python3 scripts/privledger.py
 ```
 
-`scripts/privledger.py` detects macOS with `platform.system() == "Darwin"` and uses `scripts/record-mac.sh`. Other platforms use `scripts/record-linux.sh`.
+The script selects `scripts/record-mac.sh` on macOS and `scripts/record-linux.sh` on Linux. Stop it with Ctrl+C.
 
-Record and immediately open metadata enrichment after a clean non-bad artifact:
+Run capture and open the CLI enrichment after a clean non-bad artifact:
 
 ```bash
 python3 scripts/privledger.py --enrich
@@ -33,62 +61,21 @@ python3 scripts/enrich.py 2026-02-27-0727.json
 
 The argument may be a timestamp, JSON filename, media filename, or path that resolves to a timestamp.
 
-Run focused behavior tests:
+Run focused behavior tests and lint:
 
 ```bash
-PYTHONPATH=. pytest tests/test_writer_invariants.py tests/test_enrich_behavior.py -q
-```
-
-Run lint:
-
-```bash
+PYTHONPATH=. python3 -m pytest tests/test_writer_invariants.py tests/test_enrich_behavior.py -q
 uv run ruff check .
-```
-
-Run type checking when `basedpyright` is installed:
-
-```bash
-uv run basedpyright
 ```
 
 ## Recording Output
 
-Recording writes into `vlog/`.
+Recording writes to `vlog/`. Possible media outcomes include `TS.mkv`, `TS.mov`, their `.bad` variants, or no media artifact. Metadata is written as `vlog/TS.json`; transcripts are stored under `vlog/transcripts/`. These files are durable source data. Logs under `logs/` and the SQLite database/thumbnails under `.privledger/` are derived or disposable.
 
-Possible media outcomes:
+## Camera Test Constraint
 
-- `TS.mkv`
-- `TS.mkv.bad.mkv`
-- `TS.mov`
-- `TS.mov.bad.mov`
-- no media artifact
+Real camera tests require a macOS process with Camera and Microphone permission. In environments without those permissions, use the isolated fake-recorder browser suite. The opt-in real-recorder browser test uses the local configuration and camera helper, but puts generated media and metadata in a temporary test workspace.
 
-Metadata is written as:
+## Verification
 
-```text
-vlog/TS.json
-```
-
-Logs are written under `logs/` and are disposable. `vlog/` is durable state.
-
-## macOS Testing Constraint
-
-Webcam-backed recording requires a macOS process context with Camera and Microphone permission.
-
-Sandboxed automation can report `Camera access is denied` even when the same command works in an approved terminal. In CI or non-camera environments, recording behavior should be tested with mocked artifacts and mocked recorder outcomes. The tests should verify behavior from filesystem state rather than relying on real camera access.
-
-## Verification Baseline
-
-For Python changes, run:
-
-```bash
-uv run ruff check .
-```
-
-Then run the narrowest relevant tests.
-
-Known current status:
-
-- focused writer/enrichment tests pass
-- supervisor behavior tests pass
-- `basedpyright` is optional and is not part of the required verification gate
+For Python changes, run the narrow relevant tests and `uv run ruff check .`. For API/web changes, use the package scripts and the isolated UI suite documented in [ui-test.md](ui-test.md). `basedpyright` is optional and is not part of the required verification gate.

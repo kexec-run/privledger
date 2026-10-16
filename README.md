@@ -1,24 +1,10 @@
-# privledger
+# Privledger
 
-Video ledger that captures daily entries to reveal patterns and personal growth over time.
+A local video journal for recording short daily entries, enriching them with life metadata, and reviewing patterns over time. The Python pipeline writes the durable files; the web app and API provide recording, calendar, transcript, and enrichment views.
 
-README is the entrypoint. Detailed contracts live under `docs/`.
+## Demo
 
-## Principles
-
-- Append-only history
-- Atomic capture first
-- Structured metadata
-- Human-first, analysis-ready
-- Local durability
-
-## Status
-
-Capture pipeline exists. Metadata writes are schema-validated and atomic. Enrichment CLI is functional. Tag/focus invariants and supervisor behavior are encoded in tests.
-
-## Demo Screenshots
-
-These screenshots use synthetic metadata and a generated video frame; no personal recordings are included.
+Screenshots use synthetic metadata and generated media. They contain no personal recordings.
 
 ![Privledger dashboard with synthetic recordings](docs/screenshots/dashboard.png)
 
@@ -34,224 +20,110 @@ These screenshots use synthetic metadata and a generated video frame; no persona
 ![Enrichment dialog for a synthetic recording](docs/screenshots/enrichment-dialog.png)
 </details>
 
-## Quick Start
+## Requirements
 
-Install Python dependencies:
+- macOS or Linux
+- Python 3.10+
+- Node.js 26.10.0 (verified runtime)
+- npm
+- ffmpeg and ffprobe
+- Camera and microphone access for recording
+
+Linux capture also uses v4l2 video devices, PulseAudio or PipeWire with `pactl`, and a VAAPI-capable ffmpeg setup. macOS capture uses the AVFoundation camera helper in `tools/avcam-cli`.
+
+## Install
+
+Create a Python environment and install the pipeline dependencies:
 
 ```bash
-pip install --user -r requirements.txt
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
-Copy runtime config:
+Install the API and web dependencies:
+
+```bash
+cd apps/api && npm install
+cd ../web && npm install
+cd ../..
+```
+
+Initialize the macOS camera helper when using the macOS recorder:
+
+```bash
+git submodule update --init --recursive
+```
+
+Create local runtime configuration:
 
 ```bash
 cp config/env.sample config/env
 ```
 
-Edit `config/env` with device and version values.
+Edit `config/env` for the capture device and pipeline values. Linux and macOS capture requirements differ; use the [operations guide](docs/operations.md) for device discovery and troubleshooting.
 
-Run capture:
+## Run the Web App
+
+Start both local services:
+
+```bash
+./scripts/dev.sh start
+```
+
+Open the dashboard at [http://127.0.0.1:5173](http://127.0.0.1:5173). The API listens at [http://127.0.0.1:4577](http://127.0.0.1:4577).
+
+Manage services with:
+
+```bash
+./scripts/dev.sh status
+./scripts/dev.sh restart
+./scripts/dev.sh stop
+```
+
+The API rebuilds its disposable SQLite index from `vlog/` at startup. The metadata and media files in `vlog/` remain the source of truth.
+
+## CLI Use
+
+The recorder and enrichment scripts can also run without the web app:
 
 ```bash
 python3 scripts/privledger.py
-```
-
-Run capture and open enrichment after a clean recording:
-
-```bash
 python3 scripts/privledger.py --enrich
-```
-
-Enrich metadata:
-
-```bash
 python3 scripts/enrich.py vlog/TS.json
 ```
 
-Run focused behavior tests:
+The enrichment command accepts a timestamp, JSON filename, media filename, or path that resolves to a recording.
+
+## Tests
 
 ```bash
-PYTHONPATH=. pytest tests/test_writer_invariants.py tests/test_enrich_behavior.py -q
+python3 -m pytest -q
+cd apps/api && npm test && npm run build
+cd ../web && npm run build
+npm run test:e2e
 ```
 
-## Docs
+The browser suite uses a disposable workspace and a fake recorder. Real-camera verification is opt-in and requires local camera/microphone permissions:
 
-- [Architecture](docs/arch.md) - data flow, layer boundaries, invariants, failure matrix
-- [Operations](docs/operations.md) - setup, commands, recording, enrichment, verification
-- [Metadata](docs/metadata.md) - schema fields, writers, validation, stored-data invariants
-- [Enrichment](docs/enrichment.md) - prompt flow, typo resolution, focus-domain behavior
-- [Transcripts](docs/transcript.md) - batch transcript sidecars, metadata linking, translation artifacts
-- [Tags](docs/tags.md) - tag semantics, definitions, and usage rules
-- [Test Matrix](docs/test.md) - behavior matrix and failure cases
-- [Recording Guide](docs/questions.md) - what to say when you don't know what to say while recording
+```bash
+npm run test:e2e:real
+```
 
-## Tasks
+See [UI test instructions](docs/ui-test.md) for isolation behavior and test coverage.
 
-See [TODO.md](TODO.md) for current status and planned work.
+## Documentation
+
+- [Architecture](docs/arch.md): data flow, layer boundaries, invariants
+- [Operations](docs/operations.md): platform setup, devices, recording, and troubleshooting
+- [API](apps/api/README.md): endpoints, response shape, and settings
+- [Metadata](docs/metadata.md): schema fields, writers, and validation
+- [Enrichment](docs/enrichment.md): prompt flow and tag/focus behavior
+- [Transcripts](docs/transcript.md): transcript sidecars and translation artifacts
+- [Tags](docs/tags.md): tag semantics and usage
+- [Test matrix](docs/test.md): pipeline behavior and failure cases
+- [Recording guide](docs/questions.md): prompts for recording
 
 ## License
 
-Privledger is licensed under the [MIT License](LICENSE).
-The `tools/avcam-cli` submodule retains its own MIT license and copyright notice.
-
-## Requirements
-
-### Core
-
-- Python 3.10+
-- ffmpeg with VAAPI support
-- PulseAudio / PipeWire (with `pactl` available)
-- v4l2 (video devices exposed under `/dev/video*`)
-
-Verify VAAPI support:
-
-```bash
-ffmpeg -hwaccels | grep vaapi
-```
-
-If `vaapi` is not listed, hardware encoding will not work.
-
-### Python packages
-
-Install locally (user scope recommended):
-
-```bash
-pip install --user -r requirements.txt
-```
-
-If your system restricts user installs, add `--break-system-packages`.
-
-Ensure user-level binaries are in PATH:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Add to your shell config (`.bashrc`, `.zshrc`) for persistence.
-
-### Optional
-
-- `mpv` - video playback verification
-- `jq` - JSON inspection
-- `v4l-utils` - device inspection via `v4l2-ctl`
-
-These are not required for pipeline execution.
-
-## Configuration
-
-All runtime configuration is defined in `config/env`.
-
-```bash
-cp config/env.sample config/env
-```
-
-Then edit `config/env` with your device values.
-
-Required variables:
-
-- `VIDEO_DEV` - video device path
-- `AUDIO_SRC` - PulseAudio source name
-- `VAAPI_DEV` - VAAPI device, for example `/dev/dri/renderD128`
-- `SCHEMA_VERSION`
-- `PIPELINE_VERSION`
-
-Device discovery and troubleshooting details live in [docs/operations.md](docs/operations.md).
-
-### VAAPI device discovery
-
-On Linux, list the available render devices:
-
-```bash
-ls /dev/dri/render*
-```
-
-Pick the `renderD*` entry and set it as `VAAPI_DEV` in `config/env`.
-
-## Usage
-
-Use `python3` explicitly to avoid system differences.
-
-### Capture
-
-Run from repository root:
-
-```bash
-python3 scripts/privledger.py
-```
-
-Press `Ctrl+C` to stop recording with graceful shutdown.
-
-To open enrichment automatically after a clean non-bad recording:
-
-```bash
-python3 scripts/privledger.py --enrich
-```
-
-Output is written to `vlog/`:
-
-```text
-vlog/
-  TS.mkv           Linux successful capture
-  TS.mkv.bad.mkv   Linux degraded capture
-  TS.mov           macOS successful capture
-  TS.mov.bad.mov   macOS degraded capture
-  TS.json          metadata
-```
-
-### Enrich metadata
-
-```bash
-python3 scripts/enrich.py vlog/TS.json
-```
-
-The argument may also be a timestamp, media filename, or path that resolves to a timestamp.
-
-### Inspect metadata
-
-```bash
-cat vlog/TS.json | jq .
-```
-
-### Playback
-
-```bash
-mpv vlog/TS.mov  # or vlog/TS.mkv on Linux
-```
-
-## Verification
-
-Run focused invariant and enrichment tests:
-
-```bash
-PYTHONPATH=. pytest tests/test_writer_invariants.py tests/test_enrich_behavior.py -q
-```
-
-Run supervisor and custom-check behavior tests:
-
-```bash
-PYTHONPATH=. pytest tests/test_supervisor_behavior.py tests/test_check.py -q
-```
-
-Run lint:
-
-```bash
-uv run ruff check .
-```
-
-`basedpyright` is optional and is not part of the required verification gate.
-
-## Invariant Summary
-
-- Filesystem state determines capture classification.
-- A session has one timestamp and at most one final media artifact.
-- Metadata writes are validated and atomic.
-- `focus_domain` is a primary tag stored separately from regular `tags`.
-- Tag typo input resolves to canonical values before stored-data validation.
-- Prompt validation re-prompts when the user can correct input.
-
-## Troubleshooting
-
-- No output file: check `logs/` for the session log.
-- Capture fails immediately: verify `VIDEO_DEV` and `AUDIO_SRC` in `config/env`.
-- Metadata validation fails: check [docs/metadata.md](docs/metadata.md) and [docs/test.md](docs/test.md).
-- Enrichment rejects a tag or focus domain: check [docs/enrichment.md](docs/enrichment.md) and [docs/tags.md](docs/tags.md).
+Privledger is licensed under the [MIT License](LICENSE). The `tools/avcam-cli` submodule retains its own MIT license and copyright notice.

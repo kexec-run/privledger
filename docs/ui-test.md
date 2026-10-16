@@ -78,55 +78,44 @@ This document lists the current web UI surfaces and the browser checks to run wi
 
 ## Commands
 
-- `cd apps/web && npm run test:e2e`
-  - Starts isolated API/web servers on API `4578` and web `5174`.
-  - Uses fake recorder for recording tests.
-  - Excludes `@real-recorder`.
+Run the default browser suite:
 
-- `cd apps/web && npm run test:e2e:real`
-  - Starts isolated API/web servers on API `4578` and web `5174`.
-  - Uses the real Python recorder pipeline.
-  - Runs only `recording-real.spec.ts`.
-## Current Verification Result
+```bash
+cd apps/web
+npm run test:e2e
+```
 
-Latest verification on 2026-10-16 used a temporary source snapshot with its own
-`config/env`, `vlog/`, `logs/`, and SQLite cache. The browser checks started their
-API and web servers automatically.
+The npm script invokes `e2e/run-e2e.mjs`, which creates a unique temporary data root before Playwright starts the API and web servers. The fake recorder and all API/Python fixture commands use this root. The test services bind API port `4578` and web port `5174` by default; override with `PRIVLEDGER_E2E_API_PORT` and `PRIVLEDGER_E2E_WEB_PORT`.
 
-1. `cd apps/api && npm test && npm run build`
-   - Result: `18 passed`; API build passed.
-2. `python3 -m pytest -q`
-   - Result: `103 passed`.
-3. `cd apps/web && npm run build`
-   - Result: passed.
-4. `cd apps/web && npm run test:e2e`
-   - Result: `9 passed`, including enrichment rejection and correction.
-5. `cd apps/web && npm run test:e2e:real`
-   - Result: `1 passed`, including the extracted life metadata component after recording.
-6. `scripts/dev.sh` start/status/restart/stop with separate ports and synthetic data
-   - Result: both services became healthy; stop left no listening processes.
+Run the hardware-backed recorder test separately:
 
-The real-recorder test creates a real recording in the checkout running the tests.
-This verification kept it in the temporary source snapshot. Fake-recorder and
-fixture specs clean up their generated files.
+```bash
+cd apps/web
+npm run test:e2e:real
+```
+
+This uses the local camera configuration and the existing camera helper, but stores generated metadata, media, logs, and SQLite under its own temporary root. A successful run deletes that workspace. A failed or interrupted real-recorder run preserves its workspace and diagnostics under ignored `apps/web/test-results/real-recorder-failures/`.
+
+Pass Playwright selection flags after `--`, for example:
+
+```bash
+npm run test:e2e -- --grep calendar
+```
+
+Do not invoke Playwright directly for these specs: fixture helpers require `PRIVLEDGER_E2E_ROOT`, supplied by the launcher. The launcher also overrides inherited data-root, database, and pipeline command variables.
+
+## Isolation Checks
+
+The launcher tests verify that it creates only the directories and files needed for an isolated run, does not copy working recordings or cache, replaces inherited path/command overrides with test-local values, and removes only the exact temporary workspace it created. Each browser run starts fresh with an empty `vlog/`, logs directory, and SQLite cache.
+
+The real-recorder test is opt-in because it requires camera and microphone permissions. Its failure artifacts are kept for diagnosis; successful temporary recordings are deleted after the services exit.
 
 ## Execution Notes
 
-- Prefer browser locators for clicks. In the in-app browser runtime, DOM methods inside `evaluate`, such as `element.click()`, may not be available.
-- Do not assume `fetch` is available inside browser `evaluate`; check API state with `curl` or test helpers outside the page when needed.
-- The committed Playwright config starts isolated API/web servers on API `4578` and web `5174`.
-- The default E2E suite uses `apps/web/e2e/fixtures/fake-recorder.mjs`; the real camera is touched only by `npm run test:e2e:real`.
-- Fake-recorder tests assert cleanup: generated fake `vlog/TS.json`, fake media, and derived SQLite rows must be gone after refresh.
-- Disposable UI fixtures should omit `custom` unless a custom schema is enabled; `enrich.py` rejects any `custom` key when no custom schema is active.
-- Fixture-based specs use `setFixtureDate` to fix the browser date to June 29, 2026; recorder specs keep the real clock.
-- The fake-recorder spec waits for the fixture's readiness message before sending Stop, so startup timing cannot suppress its signal handler.
-- The default test configuration uses its checkout's data directory. Run it in a disposable source snapshot when the working checkout contains recordings; assumptions about empty dates otherwise depend on those files.
-- Always collect browser console warnings/errors at the end of each flow.
-
-## Better Automation Shape
-
-1. Add CI grouping: smoke/calendar/inspector on every UI change; fake recorder and enrichment before merge; real recorder only on local/manual hardware runs.
-2. Move disposable E2E fixture writing behind a shared helper that can later target a temporary repo root instead of the working `vlog/`.
-3. Add one transcript fixture day so transcript summary expansion is tested, not only the no-transcript state.
-4. Add a screenshot-mode visual check with a small screenshot diff or DOM style assertion to prove thumbnail/transcript surfaces are blurred.
-5. Add an API-level test for the no-custom-schema payload invariant: UI should omit `custom` when custom enrichment is disabled.
+- Use browser locators for interaction. Do not depend on DOM methods inside browser `evaluate`.
+- Check API state through Playwright's request fixture or a shell request, rather than assuming `fetch` exists in browser evaluation.
+- The Playwright config starts isolated API/web services and does not reuse any existing listener.
+- Fixture-based UI specs pin the browser date to June 29, 2026; recorder specs keep the real clock.
+- The fake-recorder spec waits for its readiness marker before sending Stop.
+- Disposable metadata fixtures omit `custom` unless the copied custom schema enables it.
+- Collect browser console warnings/errors at the end of each flow.
