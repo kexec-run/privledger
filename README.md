@@ -157,6 +157,16 @@ Required variables:
 
 Device discovery and troubleshooting details live in [docs/operations.md](docs/operations.md).
 
+### VAAPI device discovery
+
+On Linux, list the available render devices:
+
+```bash
+ls /dev/dri/render*
+```
+
+Pick the `renderD*` entry and set it as `VAAPI_DEV` in `config/env`.
+
 ## Usage
 
 Use `python3` explicitly to avoid system differences.
